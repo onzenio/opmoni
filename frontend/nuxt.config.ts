@@ -12,6 +12,11 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  // NUXT_PUBLIC_API_URL sobrescreve este default automaticamente (runtime config).
+  runtimeConfig: {
+    public: { apiUrl: 'http://localhost:8000' }
+  },
+
   routeRules: {
     '/api/**': {
       cors: true

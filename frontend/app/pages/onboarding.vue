@@ -7,6 +7,14 @@ definePageMeta({
 })
 
 const toast = useToast()
+const { fetchMe, register, user } = useAuth()
+
+if (!user.value && import.meta.client) {
+  await fetchMe().catch(() => {})
+}
+if (user.value) {
+  await navigateTo('/')
+}
 
 const items: StepperItem[] = [{
   value: 'account',
@@ -49,10 +57,12 @@ type CompanySchema = z.output<typeof companySchema>
 const companyState = reactive<Partial<CompanySchema>>({ company: '', size: '' })
 
 const reviewSchema = z.object({
-  terms: z.literal(true, 'Você precisa aceitar os termos')
+  terms: z.boolean('Você precisa aceitar os termos').refine(val => val === true, 'Você precisa aceitar os termos')
 })
 type ReviewSchema = z.output<typeof reviewSchema>
 const reviewState = reactive<Partial<ReviewSchema>>({ terms: false })
+
+const submitting = ref(false)
 
 // @submit só dispara após validação passar, então avançar é seguro
 function goCompany() {
@@ -75,20 +85,42 @@ async function onSubmit(event: FormSubmitEvent<ReviewSchema>) {
   if (!event.data.terms) {
     return
   }
-  // TODO: trocar por POST /api/onboarding quando o backend tiver o endpoint
-  toast.add({ title: `Conta criada para ${accountState.name}!`, color: 'success' })
-  await navigateTo('/')
+  submitting.value = true
+  try {
+    await register({
+      name: accountState.name ?? '',
+      email: accountState.email ?? '',
+      password: accountState.password ?? '',
+      company: companyState.company ?? '',
+      size: companyState.size ?? ''
+    })
+    toast.add({ title: `Conta criada para ${accountState.name}!`, color: 'success' })
+    await navigateTo('/')
+  } catch {
+    toast.add({ title: 'Não foi possível criar a conta', description: 'Verifique os dados e tente novamente.', color: 'error' })
+  } finally {
+    submitting.value = false
+  }
 }
 </script>
 
 <template>
   <div class="mx-auto flex min-h-dvh w-full max-w-2xl flex-col items-center justify-center gap-6 p-4">
     <div class="text-center">
-      <h1 class="text-xl font-semibold text-default">Bem-vindo ao opmoni</h1>
-      <p class="mt-1 text-sm text-muted">Complete as etapas para criar sua conta.</p>
+      <h1 class="text-xl font-semibold text-default">
+        Bem-vindo ao opmoni
+      </h1>
+      <p class="mt-1 text-sm text-muted">
+        Complete as etapas para criar sua conta.
+      </p>
     </div>
 
-    <UStepper v-model="step" :items="items" linear class="w-full" />
+    <UStepper
+      v-model="step"
+      :items="items"
+      linear
+      class="w-full"
+    />
 
     <UPageCard class="w-full">
       <UForm
@@ -103,10 +135,20 @@ async function onSubmit(event: FormSubmitEvent<ReviewSchema>) {
           <UInput v-model="accountState.name" placeholder="Seu nome" class="w-full" />
         </UFormField>
         <UFormField name="email" label="Email" required>
-          <UInput v-model="accountState.email" type="email" placeholder="voce@empresa.com" class="w-full" />
+          <UInput
+            v-model="accountState.email"
+            type="email"
+            placeholder="voce@empresa.com"
+            class="w-full"
+          />
         </UFormField>
         <UFormField name="password" label="Senha" required>
-          <UInput v-model="accountState.password" type="password" placeholder="Mínimo de 8 caracteres" class="w-full" />
+          <UInput
+            v-model="accountState.password"
+            type="password"
+            placeholder="Mínimo de 8 caracteres"
+            class="w-full"
+          />
         </UFormField>
       </UForm>
 
@@ -141,20 +183,36 @@ async function onSubmit(event: FormSubmitEvent<ReviewSchema>) {
       >
         <dl class="space-y-2 text-sm">
           <div class="flex justify-between gap-4">
-            <dt class="text-muted">Nome</dt>
-            <dd class="font-medium text-default">{{ accountState.name }}</dd>
+            <dt class="text-muted">
+              Nome
+            </dt>
+            <dd class="font-medium text-default">
+              {{ accountState.name }}
+            </dd>
           </div>
           <div class="flex justify-between gap-4">
-            <dt class="text-muted">Email</dt>
-            <dd class="font-medium text-default">{{ accountState.email }}</dd>
+            <dt class="text-muted">
+              Email
+            </dt>
+            <dd class="font-medium text-default">
+              {{ accountState.email }}
+            </dd>
           </div>
           <div class="flex justify-between gap-4">
-            <dt class="text-muted">Empresa</dt>
-            <dd class="font-medium text-default">{{ companyState.company }}</dd>
+            <dt class="text-muted">
+              Empresa
+            </dt>
+            <dd class="font-medium text-default">
+              {{ companyState.company }}
+            </dd>
           </div>
           <div class="flex justify-between gap-4">
-            <dt class="text-muted">Equipe</dt>
-            <dd class="font-medium text-default">{{ companyState.size }}</dd>
+            <dt class="text-muted">
+              Equipe
+            </dt>
+            <dd class="font-medium text-default">
+              {{ companyState.size }}
+            </dd>
           </div>
         </dl>
         <UFormField name="terms">
@@ -164,11 +222,18 @@ async function onSubmit(event: FormSubmitEvent<ReviewSchema>) {
 
       <template #footer>
         <div class="flex justify-between">
-          <UButton label="Voltar" color="neutral" variant="ghost" :disabled="step === 'account'" @click="prev" />
+          <UButton
+            label="Voltar"
+            color="neutral"
+            variant="ghost"
+            :disabled="step === 'account'"
+            @click="prev"
+          />
           <UButton
             :label="step === 'review' ? 'Concluir' : 'Continuar'"
             :icon="step === 'review' ? 'i-lucide-check' : undefined"
             :trailing-icon="step === 'review' ? undefined : 'i-lucide-arrow-right'"
+            :loading="submitting"
             type="submit"
             :form="formIds[step as keyof typeof formIds]"
           />
