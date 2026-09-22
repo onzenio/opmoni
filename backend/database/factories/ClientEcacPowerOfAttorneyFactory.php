@@ -27,4 +27,18 @@ class ClientEcacPowerOfAttorneyFactory extends Factory
             'notes' => null,
         ];
     }
+
+    public function configure(): static
+    {
+        return $this->afterMaking(function (ClientEcacPowerOfAttorney $powerOfAttorney): void {
+            if ($powerOfAttorney->client instanceof Client) {
+                $powerOfAttorney->account_id = $powerOfAttorney->client->account_id;
+            }
+        })->afterCreating(function (ClientEcacPowerOfAttorney $powerOfAttorney): void {
+            if ($powerOfAttorney->client instanceof Client && $powerOfAttorney->account_id !== $powerOfAttorney->client->account_id) {
+                $powerOfAttorney->account_id = $powerOfAttorney->client->account_id;
+                $powerOfAttorney->saveQuietly();
+            }
+        });
+    }
 }

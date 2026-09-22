@@ -33,4 +33,18 @@ class ClientCertificateFactory extends Factory
             'removed_at' => null,
         ];
     }
+
+    public function configure(): static
+    {
+        return $this->afterMaking(function (ClientCertificate $certificate): void {
+            if ($certificate->client instanceof Client) {
+                $certificate->account_id = $certificate->client->account_id;
+            }
+        })->afterCreating(function (ClientCertificate $certificate): void {
+            if ($certificate->client instanceof Client && $certificate->account_id !== $certificate->client->account_id) {
+                $certificate->account_id = $certificate->client->account_id;
+                $certificate->saveQuietly();
+            }
+        });
+    }
 }
