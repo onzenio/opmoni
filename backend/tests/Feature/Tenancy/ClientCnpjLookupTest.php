@@ -2,18 +2,27 @@
 
 namespace Tests\Feature\Tenancy;
 
+use App\Models\Account;
+use App\Models\AccountUser;
+use App\Models\Client;
+use App\Models\User;
 use App\Services\CnpjLookupException;
 use App\Services\CnpjWsLookup;
+use Database\Seeders\PlanSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class ClientCnpjLookupTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->seed(PlanSeeder::class);
         Cache::flush();
         Http::preventStrayRequests();
     }
@@ -199,6 +208,127 @@ class ClientCnpjLookupTest extends TestCase
         }
 
         Http::assertSentCount(3);
+    }
+
+    public function test_lookup_preview_returns_official_data_without_mutation(): void
+    {
+        Http::fake(['publica.cnpj.ws/*' => Http::response($this->providerPayload())]);
+        $this->actingAs($this->memberOf(Account::factory()->create(), 'operador'), 'sanctum');
+
+        $this->postJson('/api/clients/cnpj-lookup', ['tax_id' => '27.865.757/0001-02'])
+            ->assertOk()
+            ->assertJsonPath('data.tax_id', '27865757000102')
+            ->assertJsonPath('data.name', 'GLOBO COMUNICACAO E PARTICIPACOES S/A')
+            ->assertJsonMissingPath('data.socios');
+
+        $this->assertDatabaseCount('clients', 0);
+    }
+
+    public function test_lookup_preview_rejects_invalid_cnpj(): void
+    {
+        Http::fake();
+        $this->actingAs($this->memberOf(Account::factory()->create(), 'operador'), 'sanctum');
+
+        $this->postJson('/api/clients/cnpj-lookup', ['tax_id' => '27.865.757/0001-03'])
+            ->assertUnprocessable()->assertJsonValidationErrors('tax_id');
+
+        Http::assertSentCount(0);
+    }
+
+    public function test_lookup_preview_maps_provider_not_found(): void
+    {
+        Http::fake(['publica.cnpj.ws/*' => Http::response([], 404)]);
+        $this->actingAs($this->memberOf(Account::factory()->create(), 'operador'), 'sanctum');
+
+        $this->postJson('/api/clients/cnpj-lookup', ['tax_id' => '27865757000102'])
+            ->assertNotFound()->assertJsonPath('message', 'CNPJ não encontrado.');
+    }
+
+    public function test_user_role_cannot_use_lookup_or_refresh(): void
+    {
+        $account = Account::factory()->create();
+        $client = Client::factory()->company()->create(['account_id' => $account->getKey()]);
+        $this->actingAs($this->memberOf($account, 'user'), 'sanctum');
+
+        $this->postJson('/api/clients/cnpj-lookup', ['tax_id' => '27865757000102'])->assertForbidden();
+        $this->postJson("/api/clients/{$client->getKey()}/cnpj-refresh-preview")->assertForbidden();
+        $this->postJson("/api/clients/{$client->getKey()}/cnpj-refresh")->assertForbidden();
+    }
+
+    public function test_refresh_preview_reports_changes_without_mutating(): void
+    {
+        Http::fake(['publica.cnpj.ws/*' => Http::response($this->providerPayload())]);
+        $account = Account::factory()->create();
+        $client = Client::factory()->company()->create([
+            'account_id' => $account->getKey(),
+            'tax_id' => '27865757000102',
+            'trade_name' => 'Nome Antigo',
+        ]);
+        $this->actingAs($this->memberOf($account, 'operador'), 'sanctum');
+
+        $response = $this->postJson("/api/clients/{$client->getKey()}/cnpj-refresh-preview")
+            ->assertOk()->assertJsonPath('data.incoming.trade_name', 'GLOBOPLAY')
+            ->assertJsonPath('data.current.trade_name', 'Nome Antigo');
+
+        $this->assertArrayHasKey('trade_name', $response->json('data.changes'));
+        $this->assertSame('Nome Antigo', Client::withoutGlobalScopes()->find($client->getKey())->trade_name);
+    }
+
+    public function test_refresh_update_applies_official_fields(): void
+    {
+        Http::fake(['publica.cnpj.ws/*' => Http::response($this->providerPayload())]);
+        $account = Account::factory()->create();
+        $client = Client::factory()->company()->create([
+            'account_id' => $account->getKey(),
+            'tax_id' => '27865757000102',
+            'trade_name' => 'Nome Antigo',
+        ]);
+        $this->actingAs($this->memberOf($account, 'operador'), 'sanctum');
+
+        $this->postJson("/api/clients/{$client->getKey()}/cnpj-refresh", [])
+            ->assertOk()->assertJsonPath('data.trade_name', 'GLOBOPLAY');
+
+        $this->assertSame('GLOBOPLAY', Client::withoutGlobalScopes()->find($client->getKey())->trade_name);
+    }
+
+    public function test_refresh_rejects_individual_and_preserves_data(): void
+    {
+        Http::fake();
+        $account = Account::factory()->create();
+        $client = Client::factory()->individual()->create(['account_id' => $account->getKey()]);
+        $this->actingAs($this->memberOf($account, 'operador'), 'sanctum');
+
+        $this->postJson("/api/clients/{$client->getKey()}/cnpj-refresh-preview")
+            ->assertUnprocessable()->assertJsonValidationErrors('tax_id');
+        $this->postJson("/api/clients/{$client->getKey()}/cnpj-refresh", [])
+            ->assertUnprocessable()->assertJsonValidationErrors('tax_id');
+
+        Http::assertSentCount(0);
+    }
+
+    public function test_refresh_failure_preserves_stored_data(): void
+    {
+        Http::fake(['publica.cnpj.ws/*' => Http::response([], 500)]);
+        $account = Account::factory()->create();
+        $client = Client::factory()->company()->create([
+            'account_id' => $account->getKey(),
+            'tax_id' => '27865757000102',
+            'trade_name' => 'Nome Antigo',
+        ]);
+        $this->actingAs($this->memberOf($account, 'operador'), 'sanctum');
+
+        $this->postJson("/api/clients/{$client->getKey()}/cnpj-refresh", [])->assertStatus(503);
+
+        $this->assertSame('Nome Antigo', Client::withoutGlobalScopes()->find($client->getKey())->trade_name);
+    }
+
+    private function memberOf(Account $account, string $role = 'operador'): User
+    {
+        $user = User::factory()->create();
+        AccountUser::create(['account_id' => $account->getKey(), 'user_id' => $user->getKey(), 'role' => $role]);
+        $user->forceFill(['current_account_id' => $account->getKey()])->save();
+
+        return $user->refresh();
     }
 
     /**

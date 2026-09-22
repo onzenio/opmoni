@@ -114,9 +114,9 @@ class SupportAccessTest extends TestCase
             ->assertOk();
 
         $clientId = $this->actingAs($superAdmin, 'sanctum')
-            ->postJson('/api/clients', ['name' => 'Cliente Suporte'])
+            ->postJson('/api/clients', $this->individualClientPayload(['name' => 'Cliente Suporte']))
             ->assertCreated()
-            ->json('id');
+            ->json('data.id');
 
         $this->actingAs($superAdmin, 'sanctum')
             ->putJson("/api/clients/{$clientId}", ['name' => 'Cliente Suporte Editado'])
@@ -128,7 +128,7 @@ class SupportAccessTest extends TestCase
             ->deleteJson("/api/clients/{$clientId}")
             ->assertNoContent();
 
-        $this->assertNull(Client::withoutGlobalScopes()->find($clientId));
+        $this->assertSoftDeleted('clients', ['id' => $clientId]);
 
         foreach (['create', 'update', 'delete'] as $action) {
             $this->assertDatabaseHas('support_access_logs', [
@@ -149,7 +149,7 @@ class SupportAccessTest extends TestCase
         $homeId = $superAdmin->current_account_id;
 
         $this->actingAs($superAdmin, 'sanctum')
-            ->postJson('/api/clients', ['name' => 'Cliente Próprio'])
+            ->postJson('/api/clients', $this->individualClientPayload(['name' => 'Cliente Próprio']))
             ->assertCreated();
 
         $this->assertSame(0, SupportAccessLog::count());
@@ -198,7 +198,7 @@ class SupportAccessTest extends TestCase
         $this->actingAs($member, 'sanctum')
             ->getJson('/api/clients')
             ->assertOk()
-            ->assertJsonCount(1);
+            ->assertJsonCount(1, 'data');
     }
 
     public function test_plan_change_via_admin_applies_limits_immediately(): void
@@ -210,7 +210,7 @@ class SupportAccessTest extends TestCase
         Client::factory()->count(50)->create(['account_id' => $account->getKey()]);
 
         $this->actingAs($member, 'sanctum')
-            ->postJson('/api/clients', ['name' => 'Cliente 51'])
+            ->postJson('/api/clients', $this->individualClientPayload())
             ->assertUnprocessable();
 
         $subscriptionId = $account->subscription->getKey();
@@ -222,7 +222,7 @@ class SupportAccessTest extends TestCase
             ->assertOk();
 
         $this->actingAs($member, 'sanctum')
-            ->postJson('/api/clients', ['name' => 'Cliente 51'])
+            ->postJson('/api/clients', $this->individualClientPayload(['name' => 'Cliente 51']))
             ->assertCreated();
 
         $this->assertSame(51, $account->clients()->count());
@@ -273,6 +273,18 @@ class SupportAccessTest extends TestCase
             ->getJson('/api/admin/support/logs')
             ->assertOk()
             ->assertJsonFragment(['action' => 'enter']);
+    }
+
+    /** @return array<string, string> */
+    private function individualClientPayload(array $overrides = []): array
+    {
+        return array_replace([
+            'person_type' => 'individual',
+            'tax_id' => '52998224725',
+            'name' => 'Cliente Teste',
+            'status' => 'active',
+            'tax_regime' => 'not_applicable',
+        ], $overrides);
     }
 
     private function superAdminWithOwnAccount(): User

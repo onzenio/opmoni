@@ -9,6 +9,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SupportAccessController;
 use App\Http\Controllers\Tenant\AccountMemberController;
 use App\Http\Controllers\Tenant\AccountSwitchController;
+use App\Http\Controllers\Tenant\ClientCnpjLookupController;
+use App\Http\Controllers\Tenant\ClientCnpjRefreshController;
 use App\Http\Controllers\Tenant\ClientController;
 use App\Http\Controllers\Tenant\DocumentController;
 use App\Http\Controllers\Tenant\ProcessController;
@@ -28,6 +30,9 @@ Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
 Route::post('/account/switch', AccountSwitchController::class)->middleware('auth:sanctum');
 
 Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
+    Route::post('clients/cnpj-lookup', ClientCnpjLookupController::class);
+    Route::post('clients/{client}/cnpj-refresh-preview', [ClientCnpjRefreshController::class, 'preview']);
+    Route::post('clients/{client}/cnpj-refresh', [ClientCnpjRefreshController::class, 'update']);
     Route::apiResource('clients', ClientController::class);
     Route::apiResource('monitorings', SerproMonitoringController::class);
     Route::apiResource('documents', DocumentController::class);
