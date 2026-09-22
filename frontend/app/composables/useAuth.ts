@@ -37,6 +37,8 @@ export function useAuth() {
   const isSuperAdmin = useState<boolean>('auth.is-super-admin', () => false)
   const accounts = useState<AuthAccountLink[]>('auth.accounts', () => [])
   const currentAccount = useState<AuthCurrentAccount | null>('auth.current-account', () => null)
+  const currentRole = computed(() => accounts.value.find(account => account.id === currentAccount.value?.id)?.role ?? null)
+  const canManageClients = computed(() => isSuperAdmin.value || currentRole.value === 'admin' || currentRole.value === 'operador')
 
   function applyMe(me: MeResponse) {
     user.value = { id: me.id, name: me.name, email: me.email }
@@ -102,5 +104,5 @@ export function useAuth() {
     return fetchMe()
   }
 
-  return { user, isSuperAdmin, accounts, currentAccount, fetchMe, login, register, logout, switchAccount, enterSupport, exitSupport }
+  return { user, isSuperAdmin, accounts, currentAccount, currentRole, canManageClients, fetchMe, login, register, logout, switchAccount, enterSupport, exitSupport }
 }
