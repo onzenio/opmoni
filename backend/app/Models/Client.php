@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
@@ -62,6 +64,24 @@ class Client extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    public function certificateHistory(): HasMany
+    {
+        return $this->hasMany(ClientCertificate::class)->latest('id');
+    }
+
+    public function currentCertificate(): HasOne
+    {
+        return $this->hasOne(ClientCertificate::class)
+            ->whereNull('replaced_at')
+            ->whereNull('removed_at')
+            ->latestOfMany();
+    }
+
+    public function ecacPowerOfAttorney(): HasOne
+    {
+        return $this->hasOne(ClientEcacPowerOfAttorney::class);
     }
 
     public function scopeSearch(Builder $query, ?string $term): Builder
