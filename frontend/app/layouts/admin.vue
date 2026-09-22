@@ -2,6 +2,7 @@
 import type { NavigationMenuItem } from '@nuxt/ui'
 
 const inSupportMode = useSupportMode()
+const { isSuperAdmin } = useAuth()
 const open = ref(false)
 
 const links: NavigationMenuItem[] = [{
@@ -71,7 +72,7 @@ const links: NavigationMenuItem[] = [{
         :ui="{ footer: 'lg:border-t lg:border-default' }"
       >
         <template #header="{ collapsed }">
-          <AccountSwitcher :collapsed="collapsed" />
+          <AccountSwitcher v-if="isSuperAdmin" :collapsed="collapsed" />
         </template>
 
         <template #default="{ collapsed }">

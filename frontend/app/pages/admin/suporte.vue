@@ -91,9 +91,17 @@ async function search() {
       const account = await $api<AdminAccount>(`/admin/accounts/${term}`)
       found.value = [account]
     } else {
-      const res = await $api<Paginated<AdminAccount>>('/admin/accounts', { params: { page: 1 } })
       const lower = term.toLowerCase()
-      found.value = res.data.filter(a => a.name.toLowerCase().includes(lower))
+      const matches: AdminAccount[] = []
+      let page = 1
+      let lastPage = 1
+      do {
+        const res = await $api<Paginated<AdminAccount>>('/admin/accounts', { params: { page } })
+        lastPage = res.last_page
+        matches.push(...res.data.filter(a => a.name.toLowerCase().includes(lower)))
+        page += 1
+      } while (page <= lastPage)
+      found.value = matches
     }
     if (!found.value.length) {
       toast.add({ title: 'Nenhuma conta encontrada', color: 'neutral' })

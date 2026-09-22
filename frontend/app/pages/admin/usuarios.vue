@@ -11,7 +11,7 @@ interface AdminUser {
   name: string
   email: string
   is_super_admin: boolean
-  accountLinks?: { role: string, account?: { id: number, name: string } | null }[]
+  account_links?: { role: string, account?: { id: number, name: string } | null }[]
 }
 
 interface Paginated<T> {
@@ -81,9 +81,9 @@ watch(page, load)
         </template>
 
         <template #accounts-cell="{ row }">
-          <div v-if="row.original.accountLinks?.length" class="flex flex-wrap gap-1.5">
+          <div v-if="row.original.account_links?.length" class="flex flex-wrap gap-1.5">
             <UBadge
-              v-for="link in row.original.accountLinks"
+              v-for="link in row.original.account_links"
               :key="`${link.account?.id}-${link.role}`"
               color="neutral"
               variant="subtle"
