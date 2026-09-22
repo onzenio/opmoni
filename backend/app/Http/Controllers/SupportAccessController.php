@@ -13,12 +13,17 @@ class SupportAccessController extends Controller
     {
         $user = $request->user();
 
-        SupportAccessLog::create([
-            'super_admin_user_id' => $user->getKey(),
-            'account_id' => $account->getKey(),
-            'action' => 'enter',
-            'ip' => $request->ip(),
-        ]);
+        $isForeignEntry = $user->accountRole($account) === null
+            && (int) $user->current_account_id !== (int) $account->getKey();
+
+        if ($isForeignEntry) {
+            SupportAccessLog::create([
+                'super_admin_user_id' => $user->getKey(),
+                'account_id' => $account->getKey(),
+                'action' => 'enter',
+                'ip' => $request->ip(),
+            ]);
+        }
 
         $user->forceFill(['current_account_id' => $account->getKey()])->save();
 

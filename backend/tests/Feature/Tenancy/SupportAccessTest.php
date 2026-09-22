@@ -41,6 +41,36 @@ class SupportAccessTest extends TestCase
         $this->assertNotNull(SupportAccessLog::firstWhere('action', 'enter')->ip);
     }
 
+    public function test_super_admin_enter_own_account_creates_no_log(): void
+    {
+        $superAdmin = $this->superAdminWithOwnAccount();
+        $homeId = $superAdmin->current_account_id;
+
+        $this->actingAs($superAdmin, 'sanctum')
+            ->postJson("/api/support/accounts/{$homeId}/enter")
+            ->assertOk();
+
+        $this->assertSame($homeId, $superAdmin->refresh()->current_account_id);
+        $this->assertSame(0, SupportAccessLog::count());
+    }
+
+    public function test_super_admin_reenter_same_foreign_account_creates_no_duplicate_log(): void
+    {
+        $superAdmin = $this->superAdminWithOwnAccount();
+        $target = Account::factory()->create();
+
+        $this->actingAs($superAdmin, 'sanctum')
+            ->postJson("/api/support/accounts/{$target->getKey()}/enter")
+            ->assertOk();
+
+        $this->actingAs($superAdmin, 'sanctum')
+            ->postJson("/api/support/accounts/{$target->getKey()}/enter")
+            ->assertOk();
+
+        $this->assertSame($target->getKey(), $superAdmin->refresh()->current_account_id);
+        $this->assertSame(1, SupportAccessLog::where('action', 'enter')->count());
+    }
+
     public function test_super_admin_exit_restores_own_account_and_logs(): void
     {
         $superAdmin = $this->superAdminWithOwnAccount();

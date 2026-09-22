@@ -12,6 +12,11 @@ class AccountObserver
      */
     public function created(Account $account): void
     {
-        $account->subscription()->create(['plan_id' => Plan::bySlug('basico')->getKey()]);
+        $plan = Plan::firstOrCreate(
+            ['slug' => 'basico'],
+            ['name' => 'Básico', 'limits' => ['users' => 5, 'clients' => 50, 'monitorings' => 100]]
+        );
+
+        $account->subscription()->create(['plan_id' => $plan->getKey()]);
     }
 }
