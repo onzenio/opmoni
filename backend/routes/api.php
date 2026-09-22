@@ -9,6 +9,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SupportAccessController;
 use App\Http\Controllers\Tenant\AccountMemberController;
 use App\Http\Controllers\Tenant\AccountSwitchController;
+use App\Http\Controllers\Tenant\ClientCertificateController;
 use App\Http\Controllers\Tenant\ClientCnpjLookupController;
 use App\Http\Controllers\Tenant\ClientCnpjRefreshController;
 use App\Http\Controllers\Tenant\ClientController;
@@ -33,6 +34,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('clients/cnpj-lookup', ClientCnpjLookupController::class);
     Route::post('clients/{client}/cnpj-refresh-preview', [ClientCnpjRefreshController::class, 'preview']);
     Route::post('clients/{client}/cnpj-refresh', [ClientCnpjRefreshController::class, 'update']);
+    Route::post('clients/{client}/certificate', [ClientCertificateController::class, 'store']);
+    Route::delete('clients/{client}/certificate', [ClientCertificateController::class, 'destroy']);
     Route::apiResource('clients', ClientController::class);
     Route::apiResource('monitorings', SerproMonitoringController::class);
     Route::apiResource('documents', DocumentController::class);
