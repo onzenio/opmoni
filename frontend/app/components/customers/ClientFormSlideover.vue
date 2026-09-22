@@ -3,6 +3,8 @@ import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { Client, ClientUpdatePayload, ClientWritePayload, CnpjPreview, CnpjRefreshPreview } from '~/types/client'
 
+defineOptions({ inheritAttrs: false })
+
 const props = defineProps<{
   open: boolean
   client?: Client | null
@@ -47,7 +49,7 @@ const individualSchema = z.object({
   district: z.string().max(255).optional(),
   postal_code: z.string().max(9).optional(),
   city: z.string().max(255).optional(),
-  state: z.string().length(2, 'UF deve ter 2 letras').optional()
+  state: z.string().length(2, 'UF deve ter 2 letras').or(z.literal('')).optional()
 })
 
 const schema = z.discriminatedUnion('person_type', [companySchema, individualSchema])
@@ -296,6 +298,7 @@ const refreshEntries = computed(() => {
 
 <template>
   <USlideover
+    v-bind="$attrs"
     v-model:open="isOpen"
     :title="isEditing ? 'Editar cliente' : 'Novo cliente'"
     description="Informe o documento e confirme os dados cadastrais"
@@ -405,6 +408,15 @@ const refreshEntries = computed(() => {
               name="tax_id"
             >
               <UInput v-model="state.tax_id" class="w-full" disabled />
+            </UFormField>
+
+            <UFormField
+              v-if="!isEditing && state.person_type === 'individual'"
+              label="CPF"
+              name="tax_id"
+              help="Somente números"
+            >
+              <UInput v-model="state.tax_id" placeholder="000.000.000-00" class="w-full" />
             </UFormField>
 
             <UFormField

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Client } from '~/types/client'
 
+defineOptions({ inheritAttrs: false })
+
 const props = defineProps<{
   open: boolean
   client?: Client | null
@@ -49,6 +51,7 @@ async function onDelete() {
 
 <template>
   <UModal
+    v-bind="$attrs"
     v-model:open="isOpen"
     title="Excluir cliente"
     :description="client ? `Excluir ${client.name} da carteira` : 'Excluir cliente da carteira'"

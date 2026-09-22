@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Client } from '~/types/client'
 
+defineOptions({ inheritAttrs: false })
+
 const props = defineProps<{
   open: boolean
   client?: Client | null
@@ -71,6 +73,7 @@ watch(isOpen, (open) => {
 
 <template>
   <UModal
+    v-bind="$attrs"
     v-model:open="isOpen"
     title="Certificado digital A1"
     :description="client ? `Gerenciar certificado de ${client.name}` : 'Gerenciar certificado digital'"

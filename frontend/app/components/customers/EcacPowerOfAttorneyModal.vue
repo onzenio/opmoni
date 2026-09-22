@@ -3,6 +3,8 @@ import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { Client } from '~/types/client'
 
+defineOptions({ inheritAttrs: false })
+
 const props = defineProps<{
   open: boolean
   client?: Client | null
@@ -86,6 +88,7 @@ async function onRemove() {
 
 <template>
   <UModal
+    v-bind="$attrs"
     v-model:open="isOpen"
     title="Procuração e-CAC"
     :description="client ? `Gerenciar procuração de ${client.name}` : 'Gerenciar procuração eletrônica'"

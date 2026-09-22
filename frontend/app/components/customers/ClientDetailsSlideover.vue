@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Client, DeadlineStatus } from '~/types/client'
 
+defineOptions({ inheritAttrs: false })
+
 const props = defineProps<{
   open: boolean
   client?: Client | null
@@ -45,6 +47,7 @@ const addressLine = computed(() => {
 
 <template>
   <USlideover
+    v-bind="$attrs"
     v-model:open="isOpen"
     title="Detalhes do cliente"
     :description="client?.name ?? 'Informações cadastrais e acessos fiscais'"

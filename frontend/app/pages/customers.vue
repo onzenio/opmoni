@@ -178,25 +178,18 @@ const deleteOpen = ref(false)
 let lastTrigger: HTMLElement | null = null
 
 function rememberFocus() {
-  lastTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  if (activeElement?.getAttribute('role') === 'menuitem' && lastTrigger?.isConnected) return
+  lastTrigger = activeElement
 }
 
-function restoreFocus() {
+function restoreFocus(event: Event) {
+  event.preventDefault()
   lastTrigger?.focus?.()
   lastTrigger = null
 }
 
-function watchOverlayClose(open: Ref<boolean>) {
-  watch(open, (value, previous) => {
-    if (previous && !value) restoreFocus()
-  })
-}
-
-watchOverlayClose(detailsOpen)
-watchOverlayClose(formOpen)
-watchOverlayClose(certificateOpen)
-watchOverlayClose(powerOfAttorneyOpen)
-watchOverlayClose(deleteOpen)
+const overlayContent = { onCloseAutoFocus: restoreFocus }
 
 function openDetails(client: Client) {
   rememberFocus()
@@ -442,6 +435,7 @@ async function onDeleted() {
                   color="neutral"
                   variant="ghost"
                   :aria-label="`Ações para ${row.original.name}`"
+                  @click="rememberFocus"
                 />
               </UDropdownMenu>
             </div>
@@ -501,11 +495,35 @@ async function onDeleted() {
         </div>
       </template>
     </template>
-
-    <CustomersClientDetailsSlideover v-model:open="detailsOpen" :client="target" />
-    <CustomersClientFormSlideover v-model:open="formOpen" :client="formClient" @saved="onSaved" />
-    <CustomersCertificateModal v-model:open="certificateOpen" :client="target" @saved="onSaved" />
-    <CustomersEcacPowerOfAttorneyModal v-model:open="powerOfAttorneyOpen" :client="target" @saved="onSaved" />
-    <CustomersClientDeleteModal v-model:open="deleteOpen" :client="target" @deleted="onDeleted" />
   </UDashboardPanel>
+
+  <CustomersClientDetailsSlideover
+    v-model:open="detailsOpen"
+    :client="target"
+    :content="overlayContent"
+  />
+  <CustomersClientFormSlideover
+    v-model:open="formOpen"
+    :client="formClient"
+    :content="overlayContent"
+    @saved="onSaved"
+  />
+  <CustomersCertificateModal
+    v-model:open="certificateOpen"
+    :client="target"
+    :content="overlayContent"
+    @saved="onSaved"
+  />
+  <CustomersEcacPowerOfAttorneyModal
+    v-model:open="powerOfAttorneyOpen"
+    :client="target"
+    :content="overlayContent"
+    @saved="onSaved"
+  />
+  <CustomersClientDeleteModal
+    v-model:open="deleteOpen"
+    :client="target"
+    :content="overlayContent"
+    @deleted="onDeleted"
+  />
 </template>
