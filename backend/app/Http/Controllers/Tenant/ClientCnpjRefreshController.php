@@ -37,6 +37,6 @@ class ClientCnpjRefreshController extends Controller
             return response()->json(['message' => $exception->getMessage()], $exception->status);
         }
 
-        return new ClientResource($client);
+        return new ClientResource($client->loadMissing(['currentCertificate', 'ecacPowerOfAttorney']));
     }
 }

@@ -122,6 +122,7 @@ class Client extends Model
 
         $today = now()->startOfDay();
         $limit = $today->copy()->addDays(30)->endOfDay();
+        // Day-precision boundaries mirror DeadlineState (startOfDay today, +30d): whereDate/whereBetween/where(>, endOfDay) match expired/expiring/valid.
         $column = fn (Builder $relation, string $name): Builder => match ($status) {
             DeadlineStatus::Expired->value => $relation->whereDate($name, '<', $today),
             DeadlineStatus::Expiring->value => $relation->whereBetween($name, [$today, $limit]),
