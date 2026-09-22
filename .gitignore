@@ -39,3 +39,6 @@ docker-compose.override.yml
 
 # Material de referência local: ~1GB, só-leitura, contém .git aninhado + node_modules
 .ref/
+
+# Worktrees locais (isolamento SDD)
+.worktrees/
