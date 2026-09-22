@@ -2,8 +2,7 @@
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({
-  middleware: ['auth', 'super-admin'],
-  layout: 'admin'
+  middleware: ['auth', 'super-admin']
 })
 
 interface AdminUser {
@@ -22,6 +21,15 @@ interface Paginated<T> {
   total: number
 }
 
+const tableUi = {
+  base: 'table-fixed border-separate border-spacing-0',
+  thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
+  tbody: '[&>tr]:last:[&>td]:border-b-0',
+  th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
+  td: 'border-b border-default',
+  separator: 'h-0'
+}
+
 const { $api } = useNuxtApp()
 const toast = useToast()
 
@@ -30,14 +38,26 @@ const total = ref(0)
 const page = ref(1)
 const perPage = 15
 const loading = ref(false)
+const q = ref('')
+const typeFilter = ref<'all' | 'super' | 'user'>('all')
 
 const columns: TableColumn<AdminUser>[] = [
   { accessorKey: 'id', header: 'ID' },
   { accessorKey: 'name', header: 'Nome' },
-  { accessorKey: 'email', header: 'Email' },
   { accessorKey: 'type', header: 'Tipo' },
   { accessorKey: 'accounts', header: 'Contas' }
 ]
+
+const rows = computed(() => {
+  const term = q.value.trim().toLowerCase()
+  return users.value.filter((user) => {
+    const matchesTerm = !term || user.name.toLowerCase().includes(term) || user.email.toLowerCase().includes(term)
+    const matchesType = typeFilter.value === 'all'
+      || (typeFilter.value === 'super' && user.is_super_admin)
+      || (typeFilter.value === 'user' && !user.is_super_admin)
+    return matchesTerm && matchesType
+  })
+})
 
 async function load() {
   loading.value = true
@@ -57,51 +77,100 @@ watch(page, load)
 </script>
 
 <template>
-  <UDashboardPanel id="admin-usuarios">
-    <template #header>
-      <UDashboardNavbar title="Usuários">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-      </UDashboardNavbar>
-    </template>
+  <div>
+    <UPageCard
+      title="Usuários"
+      description="Pessoas com acesso ao sistema."
+      variant="naked"
+      orientation="horizontal"
+      class="mb-4"
+    />
 
-    <template #body>
-      <UTable
-        :data="users"
-        :columns="columns"
-        :loading="loading"
-        class="shrink-0"
-      >
-        <template #type-cell="{ row }">
-          <UBadge v-if="row.original.is_super_admin" color="primary" variant="subtle">
-            Super admin
-          </UBadge>
-          <span v-else class="text-muted">Usuário</span>
-        </template>
+    <UPageCard
+      variant="subtle"
+      :ui="{ container: 'p-0 sm:p-0 gap-y-0', wrapper: 'items-stretch', header: 'p-4 mb-0 border-b border-default' }"
+    >
+      <template #header>
+        <div class="flex flex-wrap items-center justify-between gap-1.5">
+          <UInput
+            v-model="q"
+            class="max-w-sm"
+            icon="i-lucide-search"
+            placeholder="Filtrar por nome ou email..."
+          />
 
-        <template #accounts-cell="{ row }">
-          <div v-if="row.original.account_links?.length" class="flex flex-wrap gap-1.5">
-            <UBadge
-              v-for="link in row.original.account_links"
-              :key="`${link.account?.id}-${link.role}`"
-              color="neutral"
-              variant="subtle"
-            >
-              {{ link.account?.name ?? '—' }} · {{ link.role }}
-            </UBadge>
-          </div>
-          <span v-else class="text-muted">—</span>
-        </template>
-      </UTable>
-
-      <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-        <div class="text-sm text-muted">
-          {{ total }} usuário(s) no total.
+          <USelect
+            v-model="typeFilter"
+            :items="[
+              { label: 'Todos', value: 'all' },
+              { label: 'Super admin', value: 'super' },
+              { label: 'Usuário', value: 'user' }
+            ]"
+            :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
+            placeholder="Tipo"
+            class="min-w-36"
+          />
         </div>
+      </template>
 
+      <div class="flex flex-col gap-4 p-4 sm:p-6">
+    <UTable
+      :data="rows"
+      :columns="columns"
+      :loading="loading"
+      class="shrink-0"
+      :ui="tableUi"
+    >
+      <template #name-cell="{ row }">
+        <p class="font-medium text-highlighted">
+          {{ row.original.name }}
+        </p>
+        <p class="text-muted">
+          {{ row.original.email }}
+        </p>
+      </template>
+
+      <template #type-cell="{ row }">
+        <UBadge v-if="row.original.is_super_admin" color="primary" variant="subtle">
+          Super admin
+        </UBadge>
+        <UBadge v-else color="neutral" variant="subtle">
+          Usuário
+        </UBadge>
+      </template>
+
+      <template #accounts-cell="{ row }">
+        <div v-if="row.original.account_links?.length" class="flex flex-wrap gap-1.5">
+          <UBadge
+            v-for="link in row.original.account_links"
+            :key="`${link.account?.id}-${link.role}`"
+            color="neutral"
+            variant="subtle"
+          >
+            {{ link.account?.name ?? '—' }} · {{ link.role }}
+          </UBadge>
+        </div>
+        <span v-else class="text-muted">—</span>
+      </template>
+
+      <template #empty>
+        <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
+          <UIcon name="i-lucide-users" class="size-6" />
+          <span>Nenhum usuário encontrado.</span>
+        </div>
+      </template>
+    </UTable>
+
+    <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
+      <div class="text-sm text-muted">
+        {{ rows.length }} de {{ total }} usuário(s)
+      </div>
+
+      <div class="flex items-center gap-1.5">
         <UPagination v-model:page="page" :total="total" :items-per-page="perPage" />
       </div>
-    </template>
-  </UDashboardPanel>
+    </div>
+      </div>
+    </UPageCard>
+  </div>
 </template>

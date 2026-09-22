@@ -34,20 +34,6 @@ const fields: AuthFormField[] = [{
   type: 'checkbox'
 }]
 
-const providers = [{
-  label: 'Google',
-  icon: 'i-simple-icons-google',
-  onClick: () => {
-    toast.add({ title: 'Login social ainda não configurado', color: 'neutral' })
-  }
-}, {
-  label: 'GitHub',
-  icon: 'i-simple-icons-github',
-  onClick: () => {
-    toast.add({ title: 'Login social ainda não configurado', color: 'neutral' })
-  }
-}]
-
 const schema = z.object({
   email: z.email('Email inválido'),
   password: z.string('Senha é obrigatória').min(8, 'Mínimo de 8 caracteres')
@@ -77,7 +63,6 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       <UAuthForm
         :schema="schema"
         :fields="fields"
-        :providers="providers"
         :loading="loading"
         title="Entrar no opmoni"
         description="Acesse sua conta para continuar."

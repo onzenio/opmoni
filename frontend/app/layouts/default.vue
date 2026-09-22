@@ -75,15 +75,43 @@ const links = [[{
 }]] satisfies NavigationMenuItem[][]
 
 const navLinks = computed<NavigationMenuItem[][]>(() => {
-  const main = [...(links[0] ?? [])]
+  const main: NavigationMenuItem[] = [...(links[0] ?? [])]
   if (isSuperAdmin.value) {
+    const close = () => {
+      open.value = false
+    }
     main.push({
       label: 'Admin',
       icon: 'i-lucide-shield-check',
       to: '/admin',
-      onSelect: () => {
-        open.value = false
-      }
+      defaultOpen: true,
+      type: 'trigger',
+      children: [{
+        label: 'Resumo',
+        to: '/admin',
+        exact: true,
+        onSelect: close
+      }, {
+        label: 'Contas',
+        to: '/admin/contas',
+        onSelect: close
+      }, {
+        label: 'Planos',
+        to: '/admin/planos',
+        onSelect: close
+      }, {
+        label: 'Assinaturas',
+        to: '/admin/assinaturas',
+        onSelect: close
+      }, {
+        label: 'Usuários',
+        to: '/admin/usuarios',
+        onSelect: close
+      }, {
+        label: 'Suporte',
+        to: '/admin/suporte',
+        onSelect: close
+      }]
     })
   }
   return [main, links[1] ?? []]

@@ -1,18 +1,15 @@
 # syntax=docker/dockerfile:1
 #
 # Targets:
-#   dev  (usado pelo docker-compose): `php artisan dev` com hot-reload
-#   prod: assets compilados, sem devDependencies
+#   dev  (usado pelo docker-compose): toolchain + entrypoint.
+#        Código, vendor e node_modules vêm dos volumes — o entrypoint
+#        instala quando o volume está vazio ou o lock está mais novo.
+#   prod: assets compilados, sem devDependencies.
 # Build prod: docker build --target prod ./backend
 
 FROM php:8.4-cli AS base
 
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
-COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
-COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
-
-RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
-    && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -32,29 +29,27 @@ RUN apt-get update \
 
 WORKDIR /var/www/html
 
+# Node só entra nos alvos que rodam Vite ou compilam assets.
+FROM base AS with-node
+
+COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+
 # ---------------- dev ----------------
-FROM base AS dev
+FROM with-node AS dev
 
-# Manifestos primeiro para aproveitar o cache de layers: o install só
-# roda de novo quando composer.json/lock ou package.json mudarem.
-COPY composer.json composer.lock ./
-# artisan ainda não existe neste ponto, então instala sem rodar scripts;
-# o autoload final roda após o COPY completo, com o código presente.
-RUN composer install --no-scripts --no-interaction --prefer-dist --no-progress
-
-COPY package.json .npmrc ./
-RUN npm install --no-audit --no-fund
-
-COPY . .
-RUN composer dump-autoload --optimize \
-    && php artisan package:discover --ansi
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 EXPOSE 8000 5173
 
+ENTRYPOINT ["entrypoint.sh"]
 CMD ["php", "artisan", "dev", "--inline"]
 
 # ---------------- prod ----------------
-FROM base AS prod
+FROM with-node AS prod
 
 ENV APP_ENV=production \
     APP_DEBUG=false

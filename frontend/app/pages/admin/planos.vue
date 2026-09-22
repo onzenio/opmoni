@@ -3,8 +3,7 @@ import * as z from 'zod'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
 definePageMeta({
-  middleware: ['auth', 'super-admin'],
-  layout: 'admin'
+  middleware: ['auth', 'super-admin']
 })
 
 interface AdminPlan {
@@ -14,22 +13,39 @@ interface AdminPlan {
   limits?: Record<string, number> | null
 }
 
+const tableUi = {
+  base: 'table-fixed border-separate border-spacing-0',
+  thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
+  tbody: '[&>tr]:last:[&>td]:border-b-0',
+  th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
+  td: 'border-b border-default',
+  separator: 'h-0'
+}
+
 const { $api } = useNuxtApp()
 const toast = useToast()
 
 const plans = ref<AdminPlan[]>([])
 const loading = ref(false)
+const q = ref('')
 
 const columns: TableColumn<AdminPlan>[] = [
-  { accessorKey: 'slug', header: 'Slug' },
-  { accessorKey: 'name', header: 'Nome' },
-  { accessorKey: 'limits', header: 'Limites (usuários / clientes / monitoramentos)' },
+  { accessorKey: 'name', header: 'Plano' },
+  { id: 'users', header: 'Usuários' },
+  { id: 'clients', header: 'Clientes' },
+  { id: 'monitorings', header: 'Monitoramentos' },
   { id: 'actions' }
 ]
 
-function limitLabel(plan: AdminPlan, key: string) {
+const rows = computed(() => {
+  const term = q.value.trim().toLowerCase()
+  if (!term) return plans.value
+  return plans.value.filter(plan => plan.name.toLowerCase().includes(term) || plan.slug.toLowerCase().includes(term))
+})
+
+function limitValue(plan: AdminPlan, key: string) {
   const value = plan.limits?.[key]
-  return value === undefined || value === null ? '∞' : String(value)
+  return value === undefined || value === null ? null : value
 }
 
 async function load() {
@@ -66,6 +82,17 @@ function openEdit(plan: AdminPlan) {
   editOpen.value = true
 }
 
+function planActions(plan: AdminPlan) {
+  return [{
+    type: 'label' as const,
+    label: 'Ações'
+  }, {
+    label: 'Editar limites',
+    icon: 'i-lucide-pencil',
+    onSelect: () => openEdit(plan)
+  }]
+}
+
 async function onSave(event: FormSubmitEvent<EditSchema>) {
   if (!editTarget.value) return
   const limits: Record<string, number> = {}
@@ -90,59 +117,128 @@ async function onSave(event: FormSubmitEvent<EditSchema>) {
 </script>
 
 <template>
-  <UDashboardPanel id="admin-planos">
-    <template #header>
-      <UDashboardNavbar title="Planos">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-      </UDashboardNavbar>
-    </template>
+  <div>
+    <UPageCard
+      title="Planos"
+      description="Limites de usuários, clientes e monitoramentos."
+      variant="naked"
+      orientation="horizontal"
+      class="mb-4"
+    />
 
-    <template #body>
-      <UTable
-        :data="plans"
-        :columns="columns"
-        :loading="loading"
-        class="shrink-0"
-      >
-        <template #limits-cell="{ row }">
-          <div class="flex gap-1.5">
-            <UBadge color="neutral" variant="subtle">
-              usuários: {{ limitLabel(row.original, 'users') }}
-            </UBadge>
-            <UBadge color="neutral" variant="subtle">
-              clientes: {{ limitLabel(row.original, 'clients') }}
-            </UBadge>
-            <UBadge color="neutral" variant="subtle">
-              monitoramentos: {{ limitLabel(row.original, 'monitorings') }}
-            </UBadge>
-          </div>
-        </template>
+    <UPageCard
+      variant="subtle"
+      :ui="{ container: 'p-0 sm:p-0 gap-y-0', wrapper: 'items-stretch', header: 'p-4 mb-0 border-b border-default' }"
+    >
+      <template #header>
+        <UInput
+          v-model="q"
+          class="max-w-sm"
+          icon="i-lucide-search"
+          placeholder="Filtrar por nome ou slug..."
+        />
+      </template>
 
-        <template #actions-cell="{ row }">
-          <div class="text-right">
+      <div class="flex flex-col gap-4 p-4 sm:p-6">
+    <UTable
+      :data="rows"
+      :columns="columns"
+      :loading="loading"
+      class="shrink-0"
+      :ui="tableUi"
+    >
+      <template #name-cell="{ row }">
+        <p class="font-medium text-highlighted">
+          {{ row.original.name }}
+        </p>
+        <p class="text-muted">
+          {{ row.original.slug }}
+        </p>
+      </template>
+
+      <template #users-header>
+        <div class="text-right">
+          Usuários
+        </div>
+      </template>
+      <template #clients-header>
+        <div class="text-right">
+          Clientes
+        </div>
+      </template>
+      <template #monitorings-header>
+        <div class="text-right">
+          Monitoramentos
+        </div>
+      </template>
+
+      <template #users-cell="{ row }">
+        <div class="text-right">
+          <UBadge v-if="limitValue(row.original, 'users') === null" color="neutral" variant="subtle">
+            Ilimitado
+          </UBadge>
+          <span v-else class="font-medium text-highlighted tabular-nums">{{ limitValue(row.original, 'users') }}</span>
+        </div>
+      </template>
+      <template #clients-cell="{ row }">
+        <div class="text-right">
+          <UBadge v-if="limitValue(row.original, 'clients') === null" color="neutral" variant="subtle">
+            Ilimitado
+          </UBadge>
+          <span v-else class="font-medium text-highlighted tabular-nums">{{ limitValue(row.original, 'clients') }}</span>
+        </div>
+      </template>
+      <template #monitorings-cell="{ row }">
+        <div class="text-right">
+          <UBadge v-if="limitValue(row.original, 'monitorings') === null" color="neutral" variant="subtle">
+            Ilimitado
+          </UBadge>
+          <span v-else class="font-medium text-highlighted tabular-nums">{{ limitValue(row.original, 'monitorings') }}</span>
+        </div>
+      </template>
+
+      <template #actions-cell="{ row }">
+        <div class="text-right">
+          <UDropdownMenu
+            :items="planActions(row.original)"
+            :content="{ align: 'end' }"
+          >
             <UButton
-              label="Editar limites"
-              icon="i-lucide-pencil"
+              icon="i-lucide-ellipsis-vertical"
               color="neutral"
-              variant="outline"
-              size="sm"
-              @click="openEdit(row.original)"
+              variant="ghost"
+              class="ml-auto"
             />
-          </div>
-        </template>
-      </UTable>
+          </UDropdownMenu>
+        </div>
+      </template>
 
-      <p class="text-sm text-muted">
-        Limite vazio significa ilimitado. Novos limites valem para as próximas criações.
-      </p>
-    </template>
-  </UDashboardPanel>
+      <template #empty>
+        <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
+          <UIcon name="i-lucide-layers" class="size-6" />
+          <span>Nenhum plano encontrado.</span>
+        </div>
+      </template>
+    </UTable>
 
-  <UModal v-model:open="editOpen" title="Editar plano" :description="editTarget?.slug">
+    <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
+      <div class="text-sm text-muted">
+        {{ rows.length }} de {{ plans.length }} plano(s)
+      </div>
+    </div>
+      </div>
+    </UPageCard>
+  </div>
+
+  <USlideover
+    v-model:open="editOpen"
+    title="Editar plano"
+    :description="editTarget?.slug"
+    :ui="{ footer: 'justify-end' }"
+  >
     <template #body>
       <UForm
+        id="edit-plan-form"
         :schema="editSchema"
         :state="editState"
         class="space-y-4"
@@ -175,22 +271,22 @@ async function onSave(event: FormSubmitEvent<EditSchema>) {
             class="w-full"
           />
         </UFormField>
-        <div class="flex justify-end gap-2">
-          <UButton
-            label="Cancelar"
-            color="neutral"
-            variant="subtle"
-            @click="editOpen = false"
-          />
-          <UButton
-            label="Salvar"
-            color="primary"
-            variant="solid"
-            type="submit"
-            :loading="saving"
-          />
-        </div>
       </UForm>
     </template>
-  </UModal>
+
+    <template #footer="{ close }">
+      <UButton
+        label="Cancelar"
+        color="neutral"
+        variant="outline"
+        @click="close"
+      />
+      <UButton
+        label="Salvar"
+        type="submit"
+        form="edit-plan-form"
+        :loading="saving"
+      />
+    </template>
+  </USlideover>
 </template>

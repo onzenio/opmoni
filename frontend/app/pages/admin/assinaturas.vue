@@ -3,8 +3,7 @@ import * as z from 'zod'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
 definePageMeta({
-  middleware: ['auth', 'super-admin'],
-  layout: 'admin'
+  middleware: ['auth', 'super-admin']
 })
 
 interface AdminSubscription {
@@ -34,6 +33,15 @@ const STATUS_META: Record<AdminSubscription['status'], { label: string, color: '
   canceled: { label: 'Cancelada', color: 'neutral' }
 }
 
+const tableUi = {
+  base: 'table-fixed border-separate border-spacing-0',
+  thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
+  tbody: '[&>tr]:last:[&>td]:border-b-0',
+  th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
+  td: 'border-b border-default',
+  separator: 'h-0'
+}
+
 const { $api } = useNuxtApp()
 const toast = useToast()
 
@@ -43,6 +51,8 @@ const total = ref(0)
 const page = ref(1)
 const perPage = 15
 const loading = ref(false)
+const q = ref('')
+const statusFilter = ref<'all' | AdminSubscription['status']>('all')
 
 const columns: TableColumn<AdminSubscription>[] = [
   { accessorKey: 'id', header: 'ID' },
@@ -51,6 +61,17 @@ const columns: TableColumn<AdminSubscription>[] = [
   { accessorKey: 'status', header: 'Status' },
   { id: 'actions' }
 ]
+
+const rows = computed(() => {
+  const term = q.value.trim().toLowerCase()
+  return subscriptions.value.filter((subscription) => {
+    const accountName = subscription.account?.name?.toLowerCase() ?? ''
+    const planName = subscription.plan?.name?.toLowerCase() ?? ''
+    const matchesTerm = !term || accountName.includes(term) || planName.includes(term) || String(subscription.id).includes(term)
+    const matchesStatus = statusFilter.value === 'all' || subscription.status === statusFilter.value
+    return matchesTerm && matchesStatus
+  })
+})
 
 async function load() {
   loading.value = true
@@ -89,6 +110,17 @@ function openEdit(subscription: AdminSubscription) {
   editOpen.value = true
 }
 
+function subscriptionActions(subscription: AdminSubscription) {
+  return [{
+    type: 'label' as const,
+    label: 'Ações'
+  }, {
+    label: 'Editar',
+    icon: 'i-lucide-pencil',
+    onSelect: () => openEdit(subscription)
+  }]
+}
+
 async function onSave(event: FormSubmitEvent<EditSchema>) {
   if (!editTarget.value) return
   saving.value = true
@@ -109,63 +141,113 @@ async function onSave(event: FormSubmitEvent<EditSchema>) {
 </script>
 
 <template>
-  <UDashboardPanel id="admin-assinaturas">
-    <template #header>
-      <UDashboardNavbar title="Assinaturas">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-      </UDashboardNavbar>
-    </template>
+  <div>
+    <UPageCard
+      title="Assinaturas"
+      description="Plano e status de cada conta."
+      variant="naked"
+      orientation="horizontal"
+      class="mb-4"
+    />
 
-    <template #body>
-      <UTable
-        :data="subscriptions"
-        :columns="columns"
-        :loading="loading"
-        class="shrink-0"
-      >
-        <template #account-cell="{ row }">
-          {{ row.original.account?.name ?? `#${row.original.id}` }}
-        </template>
+    <UPageCard
+      variant="subtle"
+      :ui="{ container: 'p-0 sm:p-0 gap-y-0', wrapper: 'items-stretch', header: 'p-4 mb-0 border-b border-default' }"
+    >
+      <template #header>
+        <div class="flex flex-wrap items-center justify-between gap-1.5">
+          <UInput
+            v-model="q"
+            class="max-w-sm"
+            icon="i-lucide-search"
+            placeholder="Filtrar por conta ou plano..."
+          />
 
-        <template #plan-cell="{ row }">
-          {{ row.original.plan?.name ?? '—' }}
-        </template>
-
-        <template #status-cell="{ row }">
-          <UBadge :color="STATUS_META[row.original.status].color" variant="subtle">
-            {{ STATUS_META[row.original.status].label }}
-          </UBadge>
-        </template>
-
-        <template #actions-cell="{ row }">
-          <div class="text-right">
-            <UButton
-              label="Trocar plano / status"
-              icon="i-lucide-pencil"
-              color="neutral"
-              variant="outline"
-              size="sm"
-              @click="openEdit(row.original)"
-            />
-          </div>
-        </template>
-      </UTable>
-
-      <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-        <div class="text-sm text-muted">
-          {{ total }} assinatura(s) no total.
+          <USelect
+            v-model="statusFilter"
+            :items="[
+              { label: 'Todas', value: 'all' },
+              { label: 'Ativas', value: 'active' },
+              { label: 'Inadimplentes', value: 'past_due' },
+              { label: 'Canceladas', value: 'canceled' }
+            ]"
+            :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
+            placeholder="Status"
+            class="min-w-36"
+          />
         </div>
+      </template>
 
+      <div class="flex flex-col gap-4 p-4 sm:p-6">
+    <UTable
+      :data="rows"
+      :columns="columns"
+      :loading="loading"
+      class="shrink-0"
+      :ui="tableUi"
+    >
+      <template #account-cell="{ row }">
+        <p class="font-medium text-highlighted">
+          {{ row.original.account?.name ?? `#${row.original.id}` }}
+        </p>
+      </template>
+
+      <template #plan-cell="{ row }">
+        {{ row.original.plan?.name ?? '—' }}
+      </template>
+
+      <template #status-cell="{ row }">
+        <UBadge :color="STATUS_META[row.original.status].color" variant="subtle">
+          {{ STATUS_META[row.original.status].label }}
+        </UBadge>
+      </template>
+
+      <template #actions-cell="{ row }">
+        <div class="text-right">
+          <UDropdownMenu
+            :items="subscriptionActions(row.original)"
+            :content="{ align: 'end' }"
+          >
+            <UButton
+              icon="i-lucide-ellipsis-vertical"
+              color="neutral"
+              variant="ghost"
+              class="ml-auto"
+            />
+          </UDropdownMenu>
+        </div>
+      </template>
+
+      <template #empty>
+        <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
+          <UIcon name="i-lucide-receipt" class="size-6" />
+          <span>Nenhuma assinatura encontrada.</span>
+        </div>
+      </template>
+    </UTable>
+
+    <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
+      <div class="text-sm text-muted">
+        {{ rows.length }} de {{ total }} assinatura(s)
+      </div>
+
+      <div class="flex items-center gap-1.5">
         <UPagination v-model:page="page" :total="total" :items-per-page="perPage" />
       </div>
-    </template>
-  </UDashboardPanel>
+    </div>
+      </div>
+    </UPageCard>
+  </div>
 
-  <UModal v-model:open="editOpen" title="Editar assinatura" :description="editTarget?.account?.name">
+  <USlideover
+    v-model:open="editOpen"
+    title="Editar assinatura"
+    :description="editTarget?.account?.name"
+    :ui="{ footer: 'justify-end' }"
+  >
     <template #body>
       <UForm
+        id="edit-subscription-form"
         :schema="editSchema"
         :state="editState"
         class="space-y-4"
@@ -190,22 +272,22 @@ async function onSave(event: FormSubmitEvent<EditSchema>) {
             class="w-full"
           />
         </UFormField>
-        <div class="flex justify-end gap-2">
-          <UButton
-            label="Cancelar"
-            color="neutral"
-            variant="subtle"
-            @click="editOpen = false"
-          />
-          <UButton
-            label="Salvar"
-            color="primary"
-            variant="solid"
-            type="submit"
-            :loading="saving"
-          />
-        </div>
       </UForm>
     </template>
-  </UModal>
+
+    <template #footer="{ close }">
+      <UButton
+        label="Cancelar"
+        color="neutral"
+        variant="outline"
+        @click="close"
+      />
+      <UButton
+        label="Salvar"
+        type="submit"
+        form="edit-subscription-form"
+        :loading="saving"
+      />
+    </template>
+  </USlideover>
 </template>

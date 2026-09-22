@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
+import type { TableColumn, TabsItem } from '@nuxt/ui'
 
 definePageMeta({
-  middleware: ['auth', 'super-admin'],
-  layout: 'admin'
+  middleware: ['auth', 'super-admin']
 })
 
 interface AdminAccount {
@@ -38,9 +37,29 @@ const ACTION_META: Record<string, { label: string, color: 'info' | 'neutral' | '
   delete: { label: 'Exclusão', color: 'error' }
 }
 
+const tableUi = {
+  base: 'table-fixed border-separate border-spacing-0',
+  thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
+  tbody: '[&>tr]:last:[&>td]:border-b-0',
+  th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
+  td: 'border-b border-default',
+  separator: 'h-0'
+}
+
 const { $api } = useNuxtApp()
 const toast = useToast()
 const { accounts, switchAccount, enterSupport } = useAuth()
+
+const tab = ref('entrar')
+const tabs = [{
+  label: 'Entrar',
+  value: 'entrar',
+  icon: 'i-lucide-life-buoy'
+}, {
+  label: 'Auditoria',
+  value: 'auditoria',
+  icon: 'i-lucide-scroll-text'
+}] satisfies TabsItem[]
 
 const query = ref('')
 const found = ref<AdminAccount[]>([])
@@ -50,11 +69,15 @@ const logs = ref<SupportLog[]>([])
 const logsTotal = ref(0)
 const logsPage = ref(1)
 const logsPerPage = 15
-const logsAccountId = ref<number | null>(null)
+const accountQuery = ref('')
 const loadingLogs = ref(false)
 
+const logsAccountId = computed(() => {
+  const value = Number(accountQuery.value)
+  return accountQuery.value && Number.isInteger(value) && value > 0 ? value : null
+})
+
 const logColumns: TableColumn<SupportLog>[] = [
-  { accessorKey: 'id', header: 'ID' },
   { accessorKey: 'created', header: 'Quando' },
   { accessorKey: 'actor', header: 'Super admin' },
   { accessorKey: 'account', header: 'Conta' },
@@ -132,8 +155,11 @@ async function loadLogs() {
 onMounted(loadLogs)
 watch(logsPage, loadLogs)
 watch(logsAccountId, () => {
+  if (logsPage.value === 1) {
+    void loadLogs()
+    return
+  }
   logsPage.value = 1
-  void loadLogs()
 })
 
 function actionMeta(action: string) {
@@ -142,120 +168,133 @@ function actionMeta(action: string) {
 </script>
 
 <template>
-  <UDashboardPanel id="admin-suporte">
-    <template #header>
-      <UDashboardNavbar title="Suporte">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-      </UDashboardNavbar>
-    </template>
+  <div>
+    <UPageCard
+      title="Suporte"
+      description="Entre numa conta ou consulte a auditoria."
+      variant="naked"
+      orientation="horizontal"
+      class="mb-4"
+    />
 
-    <template #body>
-      <UCard>
-        <template #header>
-          <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-search" class="size-5 text-dimmed" />
-            <h2 class="font-semibold">
-              Entrar em uma conta
-            </h2>
-          </div>
-        </template>
+    <UPageCard
+      variant="subtle"
+      :ui="{ container: 'p-0 sm:p-0 gap-y-0', wrapper: 'items-stretch', header: 'p-4 mb-0 border-b border-default' }"
+    >
+      <template #header>
+        <div class="flex flex-wrap items-center justify-between gap-1.5">
+          <UTabs v-model="tab" :items="tabs" :content="false" />
 
-        <form class="flex gap-2" @submit.prevent="search">
-          <UInput
-            v-model="query"
-            placeholder="Buscar por nome ou ID da conta..."
-            icon="i-lucide-search"
-            class="flex-1"
-          />
-          <UButton label="Buscar" type="submit" :loading="searching" />
-        </form>
-
-        <ul v-if="found.length" class="mt-4 divide-y divide-default">
-          <li v-for="account in found" :key="account.id" class="flex items-center justify-between gap-3 py-2">
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="text-sm text-muted">#{{ account.id }}</span>
-              <span class="font-medium truncate">{{ account.name }}</span>
-              <UBadge :color="account.status === 'active' ? 'success' : 'error'" variant="subtle" size="sm">
-                {{ account.status === 'active' ? 'Ativa' : 'Suspensa' }}
-              </UBadge>
-            </div>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <UInput
+              v-if="tab === 'entrar'"
+              v-model="query"
+              class="max-w-sm"
+              icon="i-lucide-search"
+              placeholder="Nome ou ID da conta"
+              @keydown.enter.prevent="search"
+            />
+            <UInput
+              v-else
+              v-model="accountQuery"
+              class="max-w-sm"
+              icon="i-lucide-search"
+              placeholder="Filtrar por ID da conta..."
+            />
             <UButton
-              label="Entrar"
+              v-if="tab === 'entrar'"
+              label="Buscar"
+              color="neutral"
+              :loading="searching"
+              @click="search"
+            />
+          </div>
+        </div>
+      </template>
+
+      <ul v-if="tab === 'entrar' && found.length" role="list" class="divide-y divide-default">
+        <li
+          v-for="account in found"
+          :key="account.id"
+          class="flex items-center justify-between gap-3 py-3 px-4 sm:px-6"
+        >
+          <div class="min-w-0">
+            <p class="font-medium text-highlighted truncate">
+              {{ account.name }}
+            </p>
+            <p class="text-sm text-muted">
+              #{{ account.id }}
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <UBadge :color="account.status === 'active' ? 'success' : 'error'" variant="subtle">
+              {{ account.status === 'active' ? 'Ativa' : 'Suspensa' }}
+            </UBadge>
+            <UButton
               icon="i-lucide-life-buoy"
-              size="sm"
+              color="neutral"
+              variant="ghost"
               @click="enterAccount(account)"
             />
-          </li>
-        </ul>
-      </UCard>
-
-      <UCard>
-        <template #header>
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-scroll-text" class="size-5 text-dimmed" />
-              <h2 class="font-semibold">
-                Auditoria de acessos
-              </h2>
-            </div>
-            <div class="flex items-center gap-2">
-              <UInputNumber
-                v-model="logsAccountId"
-                :min="1"
-                placeholder="Filtrar por conta (ID)"
-                class="w-52"
-              />
-              <UButton
-                v-if="logsAccountId"
-                label="Limpar"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                @click="logsAccountId = null"
-              />
-            </div>
           </div>
-        </template>
+        </li>
+      </ul>
+      <div v-else-if="tab === 'entrar'" class="flex flex-col items-center justify-center gap-2 py-10 text-sm text-muted">
+        <UIcon name="i-lucide-search" class="size-6" />
+        <span>Busque uma conta pelo nome ou pelo ID para entrar em suporte.</span>
+      </div>
 
-        <UTable
-          :data="logs"
-          :columns="logColumns"
-          :loading="loadingLogs"
-          class="shrink-0"
-        >
-          <template #created-cell="{ row }">
-            {{ new Date(row.original.created_at).toLocaleString('pt-BR') }}
-          </template>
+      <div v-else class="flex flex-col gap-4 p-4 sm:p-6">
+    <UTable
+      :data="logs"
+      :columns="logColumns"
+      :loading="loadingLogs"
+      class="shrink-0"
+      :ui="tableUi"
+    >
+      <template #created-cell="{ row }">
+        {{ new Date(row.original.created_at).toLocaleString('pt-BR') }}
+      </template>
 
-          <template #actor-cell="{ row }">
-            {{ row.original.super_admin?.name ?? '—' }}
-          </template>
+      <template #actor-cell="{ row }">
+        <p class="font-medium text-highlighted">
+          {{ row.original.super_admin?.name ?? '—' }}
+        </p>
+      </template>
 
-          <template #account-cell="{ row }">
-            {{ row.original.account?.name ?? `#${row.original.id}` }}
-          </template>
+      <template #account-cell="{ row }">
+        {{ row.original.account?.name ?? '—' }}
+      </template>
 
-          <template #action-cell="{ row }">
-            <UBadge :color="actionMeta(row.original.action).color" variant="subtle">
-              {{ actionMeta(row.original.action).label }}
-            </UBadge>
-          </template>
+      <template #action-cell="{ row }">
+        <UBadge :color="actionMeta(row.original.action).color" variant="subtle">
+          {{ actionMeta(row.original.action).label }}
+        </UBadge>
+      </template>
 
-          <template #ip-cell="{ row }">
-            <span class="text-muted">{{ row.original.ip ?? '—' }}</span>
-          </template>
-        </UTable>
+      <template #ip-cell="{ row }">
+        <span class="text-muted">{{ row.original.ip ?? '—' }}</span>
+      </template>
 
-        <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-4">
-          <div class="text-sm text-muted">
-            {{ logsTotal }} evento(s) no total.
-          </div>
-
-          <UPagination v-model:page="logsPage" :total="logsTotal" :items-per-page="logsPerPage" />
+      <template #empty>
+        <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
+          <UIcon name="i-lucide-scroll-text" class="size-6" />
+          <span>Nenhum evento encontrado.</span>
         </div>
-      </UCard>
-    </template>
-  </UDashboardPanel>
+      </template>
+    </UTable>
+
+    <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
+      <div class="text-sm text-muted">
+        {{ logsTotal }} evento(s)
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <UPagination v-model:page="logsPage" :total="logsTotal" :items-per-page="logsPerPage" />
+      </div>
+    </div>
+      </div>
+    </UPageCard>
+  </div>
 </template>

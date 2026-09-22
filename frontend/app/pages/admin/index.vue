@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
+
 definePageMeta({
-  middleware: ['auth', 'super-admin'],
-  layout: 'admin'
+  middleware: ['auth', 'super-admin']
 })
 
 interface Totals {
@@ -19,6 +20,14 @@ interface SupportLog {
   account?: { name: string } | null
 }
 
+const ACTION_META: Record<string, { label: string, color: 'info' | 'neutral' | 'success' | 'warning' | 'error' }> = {
+  enter: { label: 'Entrada', color: 'info' },
+  exit: { label: 'Saída', color: 'neutral' },
+  create: { label: 'Criação', color: 'success' },
+  update: { label: 'Edição', color: 'warning' },
+  delete: { label: 'Exclusão', color: 'error' }
+}
+
 const { $api } = useNuxtApp()
 const toast = useToast()
 
@@ -32,6 +41,26 @@ const cards = computed(() => [
   { label: 'Assinaturas', value: totals.value.subscriptions, icon: 'i-lucide-receipt', to: '/admin/assinaturas' },
   { label: 'Usuários', value: totals.value.users, icon: 'i-lucide-users', to: '/admin/usuarios' }
 ])
+
+const columns: TableColumn<SupportLog>[] = [
+  { accessorKey: 'created_at', header: 'Quando' },
+  { accessorKey: 'actor', header: 'Super admin' },
+  { accessorKey: 'action', header: 'Ação' },
+  { accessorKey: 'account', header: 'Conta' }
+]
+
+const tableUi = {
+  base: 'table-fixed border-separate border-spacing-0',
+  thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
+  tbody: '[&>tr]:last:[&>td]:border-b-0',
+  th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
+  td: 'border-b border-default',
+  separator: 'h-0'
+}
+
+function actionMeta(action: string) {
+  return ACTION_META[action] ?? { label: action, color: 'neutral' as const }
+}
 
 async function load() {
   loading.value = true
@@ -61,68 +90,78 @@ onMounted(load)
 </script>
 
 <template>
-  <UDashboardPanel id="admin-resumo">
-    <template #header>
-      <UDashboardNavbar title="Administração">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
+  <div class="flex flex-col gap-4 sm:gap-6">
+    <UPageGrid class="lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-px">
+      <UPageCard
+        v-for="card in cards"
+        :key="card.label"
+        :icon="card.icon"
+        :title="card.label"
+        :to="card.to"
+        variant="subtle"
+        :ui="{
+          container: 'gap-y-1.5',
+          wrapper: 'items-start',
+          leading: 'p-2.5 rounded-full bg-primary/10 ring ring-inset ring-primary/25 flex-col',
+          title: 'font-normal text-muted text-xs uppercase'
+        }"
+        class="lg:rounded-none first:rounded-l-lg last:rounded-r-lg hover:z-1"
+      >
+        <span class="text-2xl font-semibold text-highlighted">
+          <USkeleton v-if="loading" class="h-8 w-12" />
+          <template v-else>{{ card.value }}</template>
+        </span>
+      </UPageCard>
+    </UPageGrid>
 
-        <template #right>
-          <UButton label="Suporte" icon="i-lucide-life-buoy" to="/admin/suporte" />
-        </template>
-      </UDashboardNavbar>
-    </template>
+    <div>
+      <UPageCard
+        title="Acessos de suporte recentes"
+        description="Últimos eventos registrados na auditoria."
+        variant="naked"
+        orientation="horizontal"
+        class="mb-4"
+      />
 
-    <template #body>
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <UCard v-for="card in cards" :key="card.label">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-muted">
-                {{ card.label }}
-              </p>
-              <p class="text-3xl font-semibold mt-1">
-                <USkeleton v-if="loading" class="h-9 w-16" />
-                <span v-else>{{ card.value }}</span>
-              </p>
-            </div>
-            <UIcon :name="card.icon" class="size-8 text-dimmed" />
-          </div>
-          <ULink :to="card.to" class="text-sm text-primary font-medium mt-3 inline-block">
-            Gerenciar →
-          </ULink>
-        </UCard>
-      </div>
+      <UPageCard
+        variant="subtle"
+        :ui="{ container: 'p-0 sm:p-0 gap-y-0', wrapper: 'items-stretch' }"
+      >
+        <div class="p-4 sm:p-6">
+    <UTable
+      :data="recentLogs"
+      :columns="columns"
+      :loading="loading"
+      class="shrink-0"
+      :ui="tableUi"
+    >
+      <template #created_at-cell="{ row }">
+        {{ new Date(row.original.created_at).toLocaleString('pt-BR') }}
+      </template>
 
-      <UCard>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-scroll-text" class="size-5 text-dimmed" />
-              <h2 class="font-semibold">
-                Acessos de suporte recentes
-              </h2>
-            </div>
-            <ULink to="/admin/suporte" class="text-sm text-primary font-medium">
-              Ver auditoria →
-            </ULink>
-          </div>
-        </template>
+      <template #actor-cell="{ row }">
+        <span class="font-medium text-highlighted">{{ row.original.super_admin?.name ?? '—' }}</span>
+      </template>
 
-        <ul v-if="recentLogs.length" class="divide-y divide-default">
-          <li v-for="log in recentLogs" :key="log.id" class="flex items-center justify-between gap-3 py-2 text-sm">
-            <span class="min-w-0">
-              <span class="font-medium">{{ log.super_admin?.name ?? '—' }}</span>
-              <span class="text-muted"> · {{ log.action }} · {{ log.account?.name ?? '—' }}</span>
-            </span>
-            <span class="text-muted shrink-0">{{ new Date(log.created_at).toLocaleString('pt-BR') }}</span>
-          </li>
-        </ul>
-        <p v-else-if="!loading" class="text-sm text-muted">
-          Nenhum acesso de suporte registrado ainda.
-        </p>
-      </UCard>
-    </template>
-  </UDashboardPanel>
+      <template #action-cell="{ row }">
+        <UBadge :color="actionMeta(row.original.action).color" variant="subtle">
+          {{ actionMeta(row.original.action).label }}
+        </UBadge>
+      </template>
+
+      <template #account-cell="{ row }">
+        {{ row.original.account?.name ?? '—' }}
+      </template>
+
+      <template #empty>
+        <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
+          <UIcon name="i-lucide-scroll-text" class="size-6" />
+          <span>Nenhum acesso de suporte registrado ainda.</span>
+        </div>
+      </template>
+      </UTable>
+        </div>
+      </UPageCard>
+    </div>
+  </div>
 </template>
