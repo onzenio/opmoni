@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Tenant;
 
 use App\Enums\ClientStatus;
+use App\Enums\DeadlineStatus;
 use App\Enums\TaxRegime;
 use App\Models\Client;
 use Illuminate\Foundation\Http\FormRequest;
@@ -25,6 +26,7 @@ class IndexClientRequest extends FormRequest
             'q' => ['sometimes', 'nullable', 'string', 'max:255'],
             'status' => ['sometimes', Rule::enum(ClientStatus::class)],
             'tax_regime' => ['sometimes', Rule::enum(TaxRegime::class)],
+            'deadline_status' => ['sometimes', Rule::enum(DeadlineStatus::class)],
             'sort' => ['sometimes', Rule::in(['name', 'tax_id', 'status', 'tax_regime', 'created_at'])],
             'direction' => ['sometimes', Rule::in(['asc', 'desc'])],
             'page' => ['sometimes', 'integer', 'min:1'],

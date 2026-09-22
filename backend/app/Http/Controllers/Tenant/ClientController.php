@@ -34,6 +34,8 @@ class ClientController extends Controller
             ->search($data['q'] ?? null)
             ->withStatus($data['status'] ?? null)
             ->withTaxRegime($data['tax_regime'] ?? null)
+            ->withDeadlineStatus($data['deadline_status'] ?? null)
+            ->with(['currentCertificate', 'ecacPowerOfAttorney'])
             ->orderBy($sort, $direction)
             ->paginate($perPage)
             ->withQueryString();
@@ -53,12 +55,14 @@ class ClientController extends Controller
 
         SupportAudit::logWrite($request, 'clients', 'create', $client->getKey(), $this->auditContext($client));
 
-        return (new ClientResource($client))->response()->setStatusCode(201);
+        return (new ClientResource($client->loadMissing(['currentCertificate', 'ecacPowerOfAttorney'])))->response()->setStatusCode(201);
     }
 
     public function show(Client $client): ClientResource
     {
         Gate::authorize('view', $client);
+
+        $client->loadMissing(['currentCertificate', 'ecacPowerOfAttorney']);
 
         return new ClientResource($client);
     }
@@ -73,7 +77,7 @@ class ClientController extends Controller
 
         SupportAudit::logWrite($request, 'clients', 'update', $client->getKey(), $this->auditContext($client));
 
-        return new ClientResource($client);
+        return new ClientResource($client->loadMissing(['currentCertificate', 'ecacPowerOfAttorney']));
     }
 
     public function destroy(Request $request, Client $client): Response
@@ -81,7 +85,7 @@ class ClientController extends Controller
         Gate::authorize('delete', $client);
 
         $clientId = $client->getKey();
-        $context = $this->auditContext($client);
+        $context = ['name' => $client->name, 'tax_id_last4' => substr((string) $client->tax_id, -4)];
 
         $this->clients->delete($client);
 

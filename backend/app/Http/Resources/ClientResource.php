@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Client;
+use App\Services\DeadlineState;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -43,6 +44,16 @@ class ClientResource extends JsonResource
             ],
             'email' => $this->email,
             'phone' => $this->phone,
+            'certificate' => $this->whenLoaded(
+                'currentCertificate',
+                fn () => $this->currentCertificate === null ? null : new ClientCertificateResource($this->currentCertificate)
+            ),
+            'certificate_status' => resolve(DeadlineState::class)->for($this->currentCertificate?->valid_until)->value,
+            'ecac_power_of_attorney' => $this->whenLoaded(
+                'ecacPowerOfAttorney',
+                fn () => $this->ecacPowerOfAttorney === null ? null : new ClientEcacPowerOfAttorneyResource($this->ecacPowerOfAttorney)
+            ),
+            'ecac_power_of_attorney_status' => resolve(DeadlineState::class)->for($this->ecacPowerOfAttorney?->expires_at)->value,
             'source_updated_at' => $this->source_updated_at?->toISOString(),
             'looked_up_at' => $this->looked_up_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),

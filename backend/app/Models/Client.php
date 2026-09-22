@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Concerns\BelongsToAccount;
 use App\Enums\ClientPersonType;
 use App\Enums\ClientStatus;
+use App\Enums\DeadlineStatus;
 use App\Enums\TaxRegime;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -111,5 +112,31 @@ class Client extends Model
     public function scopeWithTaxRegime(Builder $query, ?string $regime): Builder
     {
         return $query->when($regime, fn (Builder $query, string $regime): Builder => $query->where('tax_regime', $regime));
+    }
+
+    public function scopeWithDeadlineStatus(Builder $query, ?string $status): Builder
+    {
+        if ($status === null) {
+            return $query;
+        }
+
+        $today = now()->startOfDay();
+        $limit = $today->copy()->addDays(30)->endOfDay();
+        $column = fn (Builder $relation, string $name): Builder => match ($status) {
+            DeadlineStatus::Expired->value => $relation->whereDate($name, '<', $today),
+            DeadlineStatus::Expiring->value => $relation->whereBetween($name, [$today, $limit]),
+            DeadlineStatus::Valid->value => $relation->where($name, '>', $limit),
+            default => $relation,
+        };
+
+        if ($status === DeadlineStatus::Missing->value) {
+            return $query->where(fn (Builder $query): Builder => $query
+                ->whereDoesntHave('currentCertificate')
+                ->orWhereDoesntHave('ecacPowerOfAttorney'));
+        }
+
+        return $query->where(fn (Builder $query): Builder => $query
+            ->whereHas('currentCertificate', fn (Builder $relation): Builder => $column($relation, 'valid_until'))
+            ->orWhereHas('ecacPowerOfAttorney', fn (Builder $relation): Builder => $column($relation, 'expires_at')));
     }
 }

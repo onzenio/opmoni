@@ -37,7 +37,7 @@ class ClientManager
         'email',
     ];
 
-    public function __construct(private CnpjWsLookup $lookup) {}
+    public function __construct(private CnpjWsLookup $lookup, private ClientCertificateVault $certificateVault) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -107,7 +107,11 @@ class ClientManager
 
     public function delete(Client $client): void
     {
-        $client->delete();
+        DB::transaction(function () use ($client): void {
+            $locked = Client::query()->whereKey($client->getKey())->lockForUpdate()->firstOrFail();
+            $this->certificateVault->remove($locked);
+            $locked->delete();
+        });
     }
 
     /**
