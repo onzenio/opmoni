@@ -1,0 +1,41 @@
+# Root — opmoni (backend/ e frontend/ têm .gitignore próprios; isto é rede de segurança + raiz)
+
+# Env local (cobre raiz e qualquer pacote sem regra própria)
+.env
+.env.*
+!.env.example
+
+# Deps / build — bate em qualquer nível (inclui futuros pacotes)
+node_modules/
+vendor/
+.nuxt/
+.output/
+.data/
+.nitro/
+.cache/
+dist/
+public/build
+public/hot
+
+# Logs / SO / IDE (não listar .agents/.cursor/.factory/.opencode: skills lá dentro devem ser commitadas)
+*.log
+logs/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+.history
+.fleet
+
+# Docker — override local nunca vai ao git
+docker-compose.override.yml
+
+# Cache de teste PHP
+.phpunit.result.cache
+.phpunit.cache/
+.phpactor.json
+
+# Material de referência local: ~1GB, só-leitura, contém .git aninhado + node_modules
+.ref/
