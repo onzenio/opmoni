@@ -18,7 +18,7 @@ export function useClients() {
 
   async function lookupCnpj(cnpj: string) {
     const response = await $api<{ data: CnpjPreview }>('/clients/cnpj-lookup', {
-      method: 'POST', body: { cnpj }
+      method: 'POST', body: { tax_id: cnpj }
     })
     return response.data
   }
