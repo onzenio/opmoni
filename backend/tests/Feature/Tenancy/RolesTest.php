@@ -193,6 +193,58 @@ class RolesTest extends TestCase
         $this->assertNull(User::firstWhere('email', 'sexto@opmoni.dev'));
     }
 
+    public function test_account_admin_cannot_access_admin_or_support_routes(): void
+    {
+        $account = Account::factory()->create();
+        $admin = $this->memberOf($account, 'admin');
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/admin/accounts')
+            ->assertForbidden();
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/admin/plans')
+            ->assertForbidden();
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/admin/users')
+            ->assertForbidden();
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/admin/support/logs')
+            ->assertForbidden();
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/support/accounts/{$account->getKey()}/enter")
+            ->assertForbidden();
+    }
+
+    public function test_only_super_admin_can_create_accounts(): void
+    {
+        $account = Account::factory()->create();
+        $admin = $this->memberOf($account, 'admin');
+
+        $before = Account::count();
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/admin/accounts', ['name' => 'Filial Proibida'])
+            ->assertForbidden();
+
+        $this->assertSame($before, Account::count());
+
+        $superAdmin = User::factory()->create();
+        $superAdmin->forceFill(['is_super_admin' => true])->save();
+
+        $this->actingAs($superAdmin, 'sanctum')
+            ->postJson('/api/admin/accounts', ['name' => 'Filial Nova'])
+            ->assertCreated();
+
+        $created = Account::firstWhere('name', 'Filial Nova');
+        $this->assertNotNull($created);
+        $this->assertSame(1, $created->subscription()->count());
+        $this->assertSame('active', $created->subscription->status);
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */
