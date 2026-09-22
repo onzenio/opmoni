@@ -28,14 +28,27 @@ final class CnpjWsLookup
 
         return Cache::remember("cnpj-ws:{$normalized}", self::CACHE_TTL_SECONDS, function () use ($normalized): array {
             $result = null;
-            $allowed = RateLimiter::attempt(self::RATE_KEY, 3, function () use ($normalized, &$result): bool {
-                $result = $this->request($normalized);
+            $exception = null;
+            $allowed = RateLimiter::attempt(self::RATE_KEY, 3, function () use ($normalized, &$result, &$exception): bool {
+                try {
+                    $result = $this->request($normalized);
+                } catch (\Throwable $caught) {
+                    $exception = $caught;
+                }
 
                 return true;
             }, 60);
 
-            if (! $allowed || ! is_array($result)) {
+            if (! $allowed) {
                 throw new CnpjLookupException('Limite temporário de consultas atingido. Tente novamente em um minuto.', 429);
+            }
+
+            if ($exception !== null) {
+                throw $exception;
+            }
+
+            if (! is_array($result)) {
+                throw new CnpjLookupException('O serviço de consulta de CNPJ está indisponível.', 503);
             }
 
             return $result;

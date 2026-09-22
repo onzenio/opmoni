@@ -173,6 +173,34 @@ class ClientCnpjLookupTest extends TestCase
         Http::assertSentCount(3);
     }
 
+    public function test_failed_outbound_attempts_consume_the_global_rate_limit_quota(): void
+    {
+        Http::fake([
+            'publica.cnpj.ws/cnpj/*' => Http::response([], 500),
+        ]);
+
+        $service = resolve(CnpjWsLookup::class);
+
+        foreach (['27865757000102', '04252011000110', '00623904000173'] as $cnpj) {
+            try {
+                $service->lookup($cnpj);
+                $this->fail('A provider server error should throw a lookup exception.');
+            } catch (CnpjLookupException $exception) {
+                $this->assertSame(503, $exception->status);
+            }
+        }
+
+        try {
+            $service->lookup('11222333000181');
+            $this->fail('The fourth failed cache miss should be rate limited.');
+        } catch (CnpjLookupException $exception) {
+            $this->assertSame(429, $exception->status);
+            $this->assertSame('Limite temporário de consultas atingido. Tente novamente em um minuto.', $exception->getMessage());
+        }
+
+        Http::assertSentCount(3);
+    }
+
     /**
      * @return array<string, mixed>
      */
