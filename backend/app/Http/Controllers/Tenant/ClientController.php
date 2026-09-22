@@ -14,6 +14,7 @@ use App\Services\CnpjLookupException;
 use App\Services\SupportAudit;
 use App\Tenant\CurrentTenant;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
@@ -62,16 +63,20 @@ class ClientController extends Controller
         return new ClientResource($client);
     }
 
-    public function update(UpdateClientRequest $request, Client $client): ClientResource
+    public function update(UpdateClientRequest $request, Client $client): ClientResource|JsonResponse
     {
-        $client = $this->clients->update($client, $request->validated());
+        try {
+            $client = $this->clients->update($client, $request->validated());
+        } catch (CnpjLookupException $exception) {
+            return response()->json(['message' => $exception->getMessage()], $exception->status);
+        }
 
         SupportAudit::logWrite($request, 'clients', 'update', $client->getKey(), $this->auditContext($client));
 
         return new ClientResource($client);
     }
 
-    public function destroy(Client $client): Response
+    public function destroy(Request $request, Client $client): Response
     {
         Gate::authorize('delete', $client);
 
@@ -80,7 +85,7 @@ class ClientController extends Controller
 
         $this->clients->delete($client);
 
-        SupportAudit::logWrite(request(), 'clients', 'delete', $clientId, $context);
+        SupportAudit::logWrite($request, 'clients', 'delete', $clientId, $context);
 
         return response()->noContent();
     }

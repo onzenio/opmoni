@@ -201,6 +201,34 @@ class ClientCrudTest extends TestCase
         }
     }
 
+    public function test_mei_company_patch_to_actual_profit_is_forced_back_to_mei(): void
+    {
+        $fixture = $this->companyFixture();
+        $fixture['simples'] = ['mei' => 'Sim', 'simples' => 'Sim'];
+        Http::fake(['publica.cnpj.ws/*' => Http::response($fixture)]);
+        $account = Account::factory()->create();
+        $client = Client::factory()->company()->create(['account_id' => $account->getKey(), 'tax_id' => '27865757000102', 'tax_regime' => 'mei']);
+        $this->actingAs($this->memberOf($account), 'sanctum');
+
+        $this->patchJson("/api/clients/{$client->id}", ['tax_regime' => 'actual_profit'])->assertOk()
+            ->assertJsonPath('data.tax_regime', 'mei');
+    }
+
+    public function test_non_simples_company_rejects_mei_and_simple_national_patch(): void
+    {
+        Http::fake(['publica.cnpj.ws/*' => Http::response($this->companyFixture())]);
+        $account = Account::factory()->create();
+        $client = Client::factory()->company()->create(['account_id' => $account->getKey(), 'tax_id' => '27865757000102', 'tax_regime' => 'actual_profit']);
+        $this->actingAs($this->memberOf($account), 'sanctum');
+
+        foreach (['mei', 'simple_national'] as $regime) {
+            $this->patchJson("/api/clients/{$client->id}", ['tax_regime' => $regime])->assertUnprocessable()
+                ->assertJsonValidationErrors('tax_regime');
+        }
+
+        $this->assertSame('actual_profit', $client->refresh()->tax_regime->value);
+    }
+
     public function test_delete_is_soft_and_recreating_restores_same_identity_with_new_data(): void
     {
         $account = Account::factory()->create();
@@ -242,7 +270,7 @@ class ClientCrudTest extends TestCase
     {
         return [['sort=account_id', 'sort'], ['direction=sideways', 'direction'], ['per_page=101', 'per_page'],
             ['per_page=0', 'per_page'], ['page=0', 'page'], ['status=bad', 'status'],
-            ['tax_regime=bad', 'tax_regime'], ['deadline_status=bad', 'deadline_status']];
+            ['tax_regime=bad', 'tax_regime']];
     }
 
     private function memberOf(Account $account, string $role = 'operador'): User

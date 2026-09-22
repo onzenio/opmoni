@@ -46,7 +46,13 @@ class ClientManager
     {
         PlanLimits::assertCanCreate($account, 'clients');
 
-        return DB::transaction(function () use ($account, $data): Client {
+        // Outbound lookup BEFORE opening the transaction so no row lock is held
+        // while waiting on the provider; failures leave no partial write behind.
+        $companyPayload = $data['person_type'] === ClientPersonType::Company->value
+            ? $this->lookup->lookup($data['tax_id'])
+            : null;
+
+        return DB::transaction(function () use ($account, $data, $companyPayload): Client {
             $existing = Client::withoutGlobalScopes()
                 ->withTrashed()
                 ->where('account_id', $account->getKey())
@@ -54,8 +60,8 @@ class ClientManager
                 ->lockForUpdate()
                 ->first();
 
-            $attributes = $data['person_type'] === ClientPersonType::Company->value
-                ? $this->companyAttributes($data)
+            $attributes = $companyPayload !== null
+                ? $this->companyAttributes($data, $companyPayload)
                 : $this->individualAttributes($data);
 
             if ($existing !== null && ! $existing->trashed()) {
@@ -83,7 +89,18 @@ class ClientManager
             : ['name', 'status', 'email', 'phone', 'street_type', 'street', 'address_number',
                 'address_complement', 'district', 'postal_code', 'city', 'state'];
 
-        $client->fill(Arr::only($data, $allowed))->save();
+        $filtered = Arr::only($data, $allowed);
+
+        if ($client->person_type === ClientPersonType::Company && array_key_exists('tax_regime', $filtered)) {
+            // Live lookup enforces the same rule as create (MEI=>mei,
+            // Simples=>simple_national, else only presumed_profit|actual_profit|other).
+            // Official registration fields are NOT overwritten here, only the regime
+            // is validated/coerced.
+            $payload = $this->lookup->lookup($client->tax_id);
+            $filtered['tax_regime'] = $this->resolveCompanyRegime($payload, $filtered['tax_regime']);
+        }
+
+        $client->fill($filtered)->save();
 
         return $client->refresh();
     }
@@ -130,12 +147,11 @@ class ClientManager
 
     /**
      * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $payload  Live lookup result (fetched before the transaction).
      * @return array<string, mixed>
      */
-    private function companyAttributes(array $data): array
+    private function companyAttributes(array $data, array $payload): array
     {
-        $payload = $this->lookup->lookup($data['tax_id']);
-
         $attributes = $this->officialAttributes($payload);
 
         if (is_string($data['email'] ?? null) && $data['email'] !== '') {
