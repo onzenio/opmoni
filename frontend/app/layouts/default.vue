@@ -3,6 +3,8 @@ import type { NavigationMenuItem } from '@nuxt/ui'
 
 const route = useRoute()
 const toast = useToast()
+const { isSuperAdmin } = useAuth()
+const inSupportMode = useSupportMode()
 
 const open = ref(false)
 
@@ -72,6 +74,21 @@ const links = [[{
   target: '_blank'
 }]] satisfies NavigationMenuItem[][]
 
+const navLinks = computed<NavigationMenuItem[][]>(() => {
+  const main = [...(links[0] ?? [])]
+  if (isSuperAdmin.value) {
+    main.push({
+      label: 'Admin',
+      icon: 'i-lucide-shield-check',
+      to: '/admin',
+      onSelect: () => {
+        open.value = false
+      }
+    })
+  }
+  return [main, links[1] ?? []]
+})
+
 const groups = computed(() => [{
   id: 'links',
   label: 'Go to',
@@ -115,7 +132,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <UDashboardGroup unit="rem">
+  <SupportBanner />
+
+  <UDashboardGroup unit="rem" :class="[inSupportMode && 'pt-12']">
     <UDashboardSidebar
       id="default"
       v-model:open="open"
@@ -125,7 +144,8 @@ onMounted(async () => {
       :ui="{ footer: 'lg:border-t lg:border-default' }"
     >
       <template #header="{ collapsed }">
-        <TeamsMenu :collapsed="collapsed" />
+        <AccountSwitcher v-if="isSuperAdmin" :collapsed="collapsed" />
+        <TeamsMenu v-else :collapsed="collapsed" />
       </template>
 
       <template #default="{ collapsed }">
@@ -133,7 +153,7 @@ onMounted(async () => {
 
         <UNavigationMenu
           :collapsed="collapsed"
-          :items="links[0]"
+          :items="navLinks[0]"
           orientation="vertical"
           tooltip
           popover
@@ -141,7 +161,7 @@ onMounted(async () => {
 
         <UNavigationMenu
           :collapsed="collapsed"
-          :items="links[1]"
+          :items="navLinks[1]"
           orientation="vertical"
           tooltip
           class="mt-auto"
