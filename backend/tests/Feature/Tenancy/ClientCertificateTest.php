@@ -7,6 +7,7 @@ use App\Models\AccountUser;
 use App\Models\Client;
 use App\Models\ClientCertificate;
 use App\Models\User;
+use App\Services\ClientCertificateVault;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -201,22 +202,72 @@ class ClientCertificateTest extends TestCase
         $this->assertSame(0, ClientCertificate::whereNull('replaced_at')->whereNull('removed_at')->count());
     }
 
+    public function test_old_file_delete_failure_preserves_new_certificate(): void
+    {
+        $account = Account::factory()->create();
+        $client = Client::factory()->individual()->create(['account_id' => $account->getKey()]);
+        $vault = $this->app->make(ClientCertificateVault::class);
+
+        ['file' => $first] = $this->pfxUpload('primeiro.pfx', 'secret');
+        $vault->replace($client, $first, 'secret');
+
+        $old = ClientCertificate::whereNull('replaced_at')->whereNull('removed_at')->sole();
+        $oldPath = $old->storage_path;
+
+        $real = Storage::disk('certificates');
+        $disk = \Mockery::mock($real)->makePartial();
+        $disk->shouldReceive('delete')->andReturnUsing(function ($paths) use ($real, $oldPath) {
+            foreach ((array) $paths as $candidate) {
+                if ($candidate === $oldPath) {
+                    throw new \RuntimeException('old delete boom');
+                }
+            }
+
+            return $real->delete($paths);
+        });
+        Storage::partialMock()->shouldReceive('disk')->with('certificates')->andReturn($disk);
+
+        ['file' => $second] = $this->pfxUpload('segundo.pfx', 'secret');
+
+        try {
+            $vault->replace($client->refresh(), $second, 'secret');
+            $this->fail('Expected the old-file delete failure to bubble up.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('old delete boom', $exception->getMessage());
+        }
+
+        $new = ClientCertificate::whereNull('replaced_at')->whereNull('removed_at')->sole();
+        $this->assertNotSame($oldPath, $new->storage_path);
+        $this->assertTrue($real->exists($new->storage_path));
+        $this->assertNotNull($old->refresh()->replaced_at);
+    }
+
     /**
      * @return array{bytes: string, file: UploadedFile}
      */
     private function pfxUpload(string $name, string $password): array
     {
-        $config = ['private_key_bits' => 1024, 'private_key_type' => OPENSSL_KEYTYPE_RSA, 'config' => '/etc/ssl/openssl.cnf'];
-        $key = openssl_pkey_new($config);
+        $key = openssl_pkey_new(array_merge(
+            ['private_key_bits' => 1024, 'private_key_type' => OPENSSL_KEYTYPE_RSA],
+            $this->opensslConfig()
+        ));
         $this->assertNotFalse($key);
-        $csr = openssl_csr_new(['CN' => 'Teste'], $key, ['digest_alg' => 'sha256', 'config' => '/etc/ssl/openssl.cnf']);
+        $csr = openssl_csr_new(['CN' => 'Teste'], $key, array_merge(['digest_alg' => 'sha256'], $this->opensslConfig()));
         $this->assertNotFalse($csr);
-        $cert = openssl_csr_sign($csr, null, $key, 365, ['digest_alg' => 'sha256', 'config' => '/etc/ssl/openssl.cnf']);
+        $cert = openssl_csr_sign($csr, null, $key, 365, array_merge(['digest_alg' => 'sha256'], $this->opensslConfig()));
         $this->assertNotFalse($cert);
         $pfx = '';
         $this->assertTrue(openssl_pkcs12_export($cert, $pfx, $key, $password));
 
         return ['bytes' => $pfx, 'file' => UploadedFile::fake()->createWithContent($name, $pfx)];
+    }
+
+    /**
+     * @return array{config?: string}
+     */
+    private function opensslConfig(): array
+    {
+        return file_exists('/etc/ssl/openssl.cnf') ? ['config' => '/etc/ssl/openssl.cnf'] : [];
     }
 
     private function memberOf(Account $account, string $role = 'operador'): User

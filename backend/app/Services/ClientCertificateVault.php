@@ -20,6 +20,7 @@ class ClientCertificateVault
         $parsed = [];
         $ciphertext = null;
         $path = null;
+        $committed = false;
 
         try {
             if (! openssl_pkcs12_read($contents, $parsed, $password) || ! isset($parsed['cert'])) {
@@ -69,14 +70,20 @@ class ClientCertificateVault
                 ]));
             });
 
+            $committed = true;
+
             if (is_string($oldPath) && $oldPath !== '') {
                 Storage::disk('certificates')->delete($oldPath);
             }
 
             return $certificate;
         } catch (\Throwable $exception) {
-            if (is_string($path) && $path !== '') {
-                Storage::disk('certificates')->delete($path);
+            if (! $committed && is_string($path) && $path !== '') {
+                try {
+                    Storage::disk('certificates')->delete($path);
+                } catch (\Throwable) {
+                    // Best effort: cleanup must never mask the original failure.
+                }
             }
 
             throw $exception;
