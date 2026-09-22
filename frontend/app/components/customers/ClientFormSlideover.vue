@@ -47,7 +47,7 @@ const individualSchema = z.object({
   district: z.string().max(255).optional(),
   postal_code: z.string().max(9).optional(),
   city: z.string().max(255).optional(),
-  state: z.string().max(2).optional()
+  state: z.string().length(2, 'UF deve ter 2 letras').optional()
 })
 
 const schema = z.discriminatedUnion('person_type', [companySchema, individualSchema])
@@ -98,22 +98,16 @@ const refreshData = ref<CnpjRefreshPreview | null>(null)
 const confirmingRefresh = ref(false)
 
 const regimeLocked = computed(() => {
-  if (!preview.value) return null
-  if (preview.value.mei) return 'mei' as const
-  if (preview.value.simple_national) return 'simple_national' as const
+  if (preview.value?.mei) return 'mei' as const
+  if (preview.value?.simple_national) return 'simple_national' as const
+  if (isEditing.value && (props.client?.tax_regime === 'mei' || props.client?.tax_regime === 'simple_national'))
+    return props.client.tax_regime as 'mei' | 'simple_national'
   return null
 })
 
 const regimeOptions = computed(() => {
-  if (!preview.value) {
-    return [
-      { label: 'Presumido', value: 'presumed_profit' },
-      { label: 'Real', value: 'actual_profit' },
-      { label: 'Outro', value: 'other' }
-    ]
-  }
-  if (preview.value.mei) return [{ label: 'MEI', value: 'mei' }]
-  if (preview.value.simple_national) return [{ label: 'Simples Nacional', value: 'simple_national' }]
+  if (regimeLocked.value === 'mei') return [{ label: 'MEI', value: 'mei' }]
+  if (regimeLocked.value === 'simple_national') return [{ label: 'Simples Nacional', value: 'simple_national' }]
   return [
     { label: 'Presumido', value: 'presumed_profit' },
     { label: 'Real', value: 'actual_profit' },
@@ -173,14 +167,14 @@ watch(() => props.open, (open) => {
     state.tax_regime = c.tax_regime ?? (state.person_type === 'individual' ? 'not_applicable' : 'presumed_profit')
     state.email = c.email ?? ''
     state.phone = c.phone ?? ''
-    state.street_type = c.address.street_type ?? ''
-    state.street = c.address.street ?? ''
-    state.address_number = c.address.number ?? ''
-    state.address_complement = c.address.complement ?? ''
-    state.district = c.address.district ?? ''
-    state.postal_code = c.address.postal_code ?? ''
-    state.city = c.address.city ?? ''
-    state.state = c.address.state ?? ''
+    state.street_type = c.address?.street_type ?? ''
+    state.street = c.address?.street ?? ''
+    state.address_number = c.address?.number ?? ''
+    state.address_complement = c.address?.complement ?? ''
+    state.district = c.address?.district ?? ''
+    state.postal_code = c.address?.postal_code ?? ''
+    state.city = c.address?.city ?? ''
+    state.state = c.address?.state ?? ''
     step.value = 2
     preview.value = null
   } else {
@@ -508,6 +502,7 @@ const refreshEntries = computed(() => {
                 label="Voltar"
                 color="neutral"
                 variant="subtle"
+                type="button"
                 @click="step = 1"
               />
               <UButton
@@ -529,6 +524,7 @@ const refreshEntries = computed(() => {
                 icon="i-lucide-refresh-cw"
                 color="neutral"
                 variant="outline"
+                type="button"
                 :loading="refreshing"
                 @click="onRefreshPreview"
               />
@@ -553,12 +549,14 @@ const refreshEntries = computed(() => {
                   label="Descartar"
                   color="neutral"
                   variant="subtle"
+                  type="button"
                   @click="confirmingRefresh = false; refreshData = null"
                 />
                 <UButton
                   label="Confirmar atualização"
                   color="warning"
                   variant="solid"
+                  type="button"
                   :loading="refreshing"
                   :disabled="!refreshEntries.length"
                   @click="onConfirmRefresh"
@@ -576,6 +574,7 @@ const refreshEntries = computed(() => {
           label="Fechar"
           color="neutral"
           variant="subtle"
+          type="button"
           @click="isOpen = false"
         />
       </div>

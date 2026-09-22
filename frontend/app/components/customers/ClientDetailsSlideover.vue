@@ -109,7 +109,7 @@ const addressLine = computed(() => {
                 Atividade principal
               </dt>
               <dd class="text-right">
-                {{ client.primary_activity.description ?? '—' }}
+                {{ client.primary_activity?.description ?? '—' }}
               </dd>
             </div>
           </dl>
@@ -194,6 +194,7 @@ const addressLine = computed(() => {
           label="Fechar"
           color="neutral"
           variant="subtle"
+          type="button"
           @click="isOpen = false"
         />
       </div>

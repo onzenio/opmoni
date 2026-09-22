@@ -22,8 +22,8 @@ const { upsertPowerOfAttorney, removePowerOfAttorney } = useClients()
 const toast = useToast()
 
 const schema = z.object({
-  starts_at: z.string().min(1, 'Informe a data de início'),
-  expires_at: z.string().min(1, 'Informe a data de vencimento'),
+  starts_at: z.string().min(1, 'Informe a data de início').regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (AAAA-MM-DD)'),
+  expires_at: z.string().min(1, 'Informe a data de vencimento').regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (AAAA-MM-DD)'),
   notes: z.string().max(2000, 'Observações limitadas a 2000 caracteres').optional()
 }).refine(data => data.expires_at >= data.starts_at, {
   message: 'O vencimento deve ser igual ou posterior ao início',
@@ -73,6 +73,7 @@ async function onRemove() {
   removing.value = true
   try {
     await removePowerOfAttorney(props.client.id)
+    emit('saved', { ...props.client, ecac_power_of_attorney: null, ecac_power_of_attorney_status: 'missing' })
     toast.add({ title: 'Procuração removida', color: 'success' })
     isOpen.value = false
   } catch {
@@ -91,6 +92,7 @@ async function onRemove() {
   >
     <template #body>
       <UForm
+        id="ecac-poa-form"
         :schema="schema"
         :state="state"
         class="space-y-4"
@@ -112,33 +114,39 @@ async function onRemove() {
             class="w-full"
           />
         </UFormField>
-        <div class="flex justify-between gap-2">
-          <UButton
-            v-if="client?.ecac_power_of_attorney"
-            label="Remover"
-            color="error"
-            variant="ghost"
-            :loading="removing"
-            @click="onRemove"
-          />
-          <span v-else />
-          <div class="flex gap-2">
-            <UButton
-              label="Cancelar"
-              color="neutral"
-              variant="subtle"
-              @click="isOpen = false"
-            />
-            <UButton
-              label="Salvar procuração"
-              color="primary"
-              variant="solid"
-              type="submit"
-              :loading="saving"
-            />
-          </div>
-        </div>
       </UForm>
+    </template>
+
+    <template #footer>
+      <div class="flex justify-between gap-2">
+        <UButton
+          v-if="client?.ecac_power_of_attorney"
+          label="Remover"
+          color="error"
+          variant="ghost"
+          type="button"
+          :loading="removing"
+          @click="onRemove"
+        />
+        <span v-else />
+        <div class="flex gap-2">
+          <UButton
+            label="Cancelar"
+            color="neutral"
+            variant="subtle"
+            type="button"
+            @click="isOpen = false"
+          />
+          <UButton
+            label="Salvar procuração"
+            color="primary"
+            variant="solid"
+            type="submit"
+            form="ecac-poa-form"
+            :loading="saving"
+          />
+        </div>
+      </div>
     </template>
   </UModal>
 </template>

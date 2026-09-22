@@ -49,6 +49,7 @@ async function confirmRemove() {
   removing.value = true
   try {
     await removeCertificate(props.client.id)
+    emit('saved', { ...props.client, certificate: null, certificate_status: 'missing' })
     confirmingRemove.value = false
     isOpen.value = false
     toast.add({ title: 'Certificado removido', color: 'success' })
@@ -119,6 +120,7 @@ watch(isOpen, (open) => {
             icon="i-lucide-trash-2"
             color="error"
             variant="ghost"
+            type="button"
             @click="confirmingRemove = true"
           />
         </div>
@@ -135,12 +137,14 @@ watch(isOpen, (open) => {
             label="Manter"
             color="neutral"
             variant="subtle"
+            type="button"
             @click="confirmingRemove = false"
           />
           <UButton
             label="Confirmar remoção"
             color="error"
             variant="solid"
+            type="button"
             :loading="removing"
             @click="confirmRemove"
           />
@@ -154,12 +158,14 @@ watch(isOpen, (open) => {
           label="Cancelar"
           color="neutral"
           variant="subtle"
+          type="button"
           @click="isOpen = false"
         />
         <UButton
           label="Enviar certificado"
           color="primary"
           variant="solid"
+          type="button"
           :loading="uploading"
           :disabled="!canSubmit"
           @click="submitCertificate"
