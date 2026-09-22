@@ -102,5 +102,5 @@ export function useAuth() {
     return fetchMe()
   }
 
-  return { user, isSuperAdmin, accounts, currentAccount, login, register, logout, switchAccount, enterSupport, exitSupport }
+  return { user, isSuperAdmin, accounts, currentAccount, fetchMe, login, register, logout, switchAccount, enterSupport, exitSupport }
 }

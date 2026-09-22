@@ -7,6 +7,14 @@ definePageMeta({
 })
 
 const toast = useToast()
+const { fetchMe, login, user } = useAuth()
+
+if (!user.value && import.meta.client) {
+  await fetchMe().catch(() => {})
+}
+if (user.value) {
+  await navigateTo('/')
+}
 
 const fields: AuthFormField[] = [{
   name: 'email',
@@ -52,9 +60,11 @@ const loading = ref(false)
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   loading.value = true
   try {
-    // TODO: trocar por POST /api/login quando o backend tiver auth
-    await navigateTo('/')
+    await login(event.data.email, event.data.password)
     toast.add({ title: `Bem-vindo de volta, ${event.data.email}!`, color: 'success' })
+    await navigateTo('/')
+  } catch {
+    toast.add({ title: 'Não foi possível entrar', description: 'Verifique seu email e senha.', color: 'error' })
   } finally {
     loading.value = false
   }

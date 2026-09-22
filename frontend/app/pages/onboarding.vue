@@ -7,6 +7,14 @@ definePageMeta({
 })
 
 const toast = useToast()
+const { fetchMe, register, user } = useAuth()
+
+if (!user.value && import.meta.client) {
+  await fetchMe().catch(() => {})
+}
+if (user.value) {
+  await navigateTo('/')
+}
 
 const items: StepperItem[] = [{
   value: 'account',
@@ -54,6 +62,8 @@ const reviewSchema = z.object({
 type ReviewSchema = z.output<typeof reviewSchema>
 const reviewState = reactive<Partial<ReviewSchema>>({ terms: false })
 
+const submitting = ref(false)
+
 // @submit só dispara após validação passar, então avançar é seguro
 function goCompany() {
   step.value = 'company'
@@ -75,9 +85,22 @@ async function onSubmit(event: FormSubmitEvent<ReviewSchema>) {
   if (!event.data.terms) {
     return
   }
-  // TODO: trocar por POST /api/onboarding quando o backend tiver o endpoint
-  toast.add({ title: `Conta criada para ${accountState.name}!`, color: 'success' })
-  await navigateTo('/')
+  submitting.value = true
+  try {
+    await register({
+      name: accountState.name ?? '',
+      email: accountState.email ?? '',
+      password: accountState.password ?? '',
+      company: companyState.company ?? '',
+      size: companyState.size ?? ''
+    })
+    toast.add({ title: `Conta criada para ${accountState.name}!`, color: 'success' })
+    await navigateTo('/')
+  } catch {
+    toast.add({ title: 'Não foi possível criar a conta', description: 'Verifique os dados e tente novamente.', color: 'error' })
+  } finally {
+    submitting.value = false
+  }
 }
 </script>
 
@@ -169,6 +192,7 @@ async function onSubmit(event: FormSubmitEvent<ReviewSchema>) {
             :label="step === 'review' ? 'Concluir' : 'Continuar'"
             :icon="step === 'review' ? 'i-lucide-check' : undefined"
             :trailing-icon="step === 'review' ? undefined : 'i-lucide-arrow-right'"
+            :loading="submitting"
             type="submit"
             :form="formIds[step as keyof typeof formIds]"
           />
