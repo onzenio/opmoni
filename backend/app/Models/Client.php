@@ -66,12 +66,21 @@ class Client extends Model
 
     public function scopeSearch(Builder $query, ?string $term): Builder
     {
-        return $query->when($term, fn (Builder $query, string $term): Builder => $query->where(
-            fn (Builder $query): Builder => $query
-                ->where('name', 'like', "%{$term}%")
-                ->orWhere('trade_name', 'like', "%{$term}%")
-                ->orWhere('tax_id', 'like', '%'.preg_replace('/\D+/', '', $term).'%')
-        ));
+        return $query->when($term, function (Builder $query, string $term): Builder {
+            $normalizedTaxId = preg_replace('/\D+/', '', $term);
+
+            return $query->where(function (Builder $query) use ($term, $normalizedTaxId): Builder {
+                $query
+                    ->where('name', 'like', "%{$term}%")
+                    ->orWhere('trade_name', 'like', "%{$term}%");
+
+                if ($normalizedTaxId !== '') {
+                    $query->orWhere('tax_id', 'like', "%{$normalizedTaxId}%");
+                }
+
+                return $query;
+            });
+        });
     }
 
     public function scopeWithStatus(Builder $query, ?string $status): Builder

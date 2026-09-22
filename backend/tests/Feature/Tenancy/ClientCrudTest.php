@@ -56,4 +56,11 @@ class ClientCrudTest extends TestCase
         $this->assertSame(0, $account->clients()->count());
         $this->assertSame(1, Client::withoutGlobalScopes()->withTrashed()->count());
     }
+
+    public function test_search_does_not_match_unrelated_clients_for_alphabetic_term(): void
+    {
+        Client::factory()->company()->create(['name' => 'Empresa Alpha']);
+
+        $this->assertSame(0, Client::search('unmatched')->count());
+    }
 }
