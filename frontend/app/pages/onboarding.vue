@@ -9,12 +9,16 @@ definePageMeta({
 const toast = useToast()
 const { fetchMe, register, user } = useAuth()
 
-if (!user.value && import.meta.client) {
-  await fetchMe().catch(() => {})
-}
-if (user.value) {
-  await navigateTo('/')
-}
+// Client-only e pós-hydration: evita divergência SSR/cliente
+// e o setup assíncrono (warning do <Suspense>).
+onMounted(async () => {
+  if (!user.value) {
+    await fetchMe().catch(() => {})
+  }
+  if (user.value) {
+    await navigateTo('/')
+  }
+})
 
 const items: StepperItem[] = [{
   value: 'account',
@@ -242,7 +246,7 @@ async function onSubmit(event: FormSubmitEvent<ReviewSchema>) {
     </UPageCard>
 
     <p class="text-sm text-muted">
-      Já tem conta? <ULink to="/login" class="font-medium text-primary">Entrar</ULink>
+      Já tem conta? <ULink to="/login" :active="false" class="font-medium text-primary">Entrar</ULink>
     </p>
   </div>
 </template>

@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import type { Client, ClientUpdatePayload, ClientWritePayload, CnpjPreview, CnpjRefreshPreview } from '~/types/client'
+import type { Client, ClientWritePayload, CnpjPreview } from '~/types/client'
 
 defineOptions({ inheritAttrs: false })
 
 const props = defineProps<{
   open: boolean
-  client?: Client | null
 }>()
 
 const emit = defineEmits<{
@@ -20,9 +19,7 @@ const isOpen = computed({
   set: value => emit('update:open', value)
 })
 
-const isEditing = computed(() => !!props.client)
-
-const { lookupCnpj, create, update, refreshPreview, refreshCnpj } = useClients()
+const { lookupCnpj, create } = useClients()
 const toast = useToast()
 
 const companySchema = z.object({
@@ -95,15 +92,10 @@ const step = ref<1 | 2>(1)
 const preview = ref<CnpjPreview | null>(null)
 const lookingUp = ref(false)
 const submitting = ref(false)
-const refreshing = ref(false)
-const refreshData = ref<CnpjRefreshPreview | null>(null)
-const confirmingRefresh = ref(false)
 
 const regimeLocked = computed(() => {
   if (preview.value?.mei) return 'mei' as const
   if (preview.value?.simple_national) return 'simple_national' as const
-  if (isEditing.value && (props.client?.tax_regime === 'mei' || props.client?.tax_regime === 'simple_national'))
-    return props.client.tax_regime as 'mei' | 'simple_national'
   return null
 })
 
@@ -151,37 +143,10 @@ function resetForm() {
   state.state = ''
   step.value = 1
   preview.value = null
-  refreshData.value = null
-  confirmingRefresh.value = false
 }
 
-watch(() => props.open, (open) => {
-  if (!open) {
-    resetForm()
-    return
-  }
-  if (props.client) {
-    const c = props.client
-    state.person_type = c.person_type ?? 'company'
-    state.tax_id = c.tax_id ?? ''
-    state.name = c.name ?? ''
-    state.status = c.status ?? 'active'
-    state.tax_regime = c.tax_regime ?? (state.person_type === 'individual' ? 'not_applicable' : 'presumed_profit')
-    state.email = c.email ?? ''
-    state.phone = c.phone ?? ''
-    state.street_type = c.address?.street_type ?? ''
-    state.street = c.address?.street ?? ''
-    state.address_number = c.address?.number ?? ''
-    state.address_complement = c.address?.complement ?? ''
-    state.district = c.address?.district ?? ''
-    state.postal_code = c.address?.postal_code ?? ''
-    state.city = c.address?.city ?? ''
-    state.state = c.address?.state ?? ''
-    step.value = 2
-    preview.value = null
-  } else {
-    resetForm()
-  }
+watch(() => props.open, () => {
+  resetForm()
 })
 
 watch(() => state.person_type, (type) => {
@@ -191,10 +156,8 @@ watch(() => state.person_type, (type) => {
     preview.value = null
   } else {
     state.tax_regime = 'presumed_profit'
-    if (!props.client) {
-      step.value = 1
-      preview.value = null
-    }
+    step.value = 1
+    preview.value = null
   }
 })
 
@@ -217,40 +180,11 @@ async function onLookup() {
   }
 }
 
-function toUpdatePayload(data: ClientWritePayload): ClientUpdatePayload {
-  if (data.person_type === 'company') {
-    return {
-      status: data.status,
-      tax_regime: data.tax_regime,
-      email: data.email,
-      phone: data.phone
-    }
-  }
-
-  return {
-    name: data.name,
-    status: data.status,
-    tax_regime: 'not_applicable',
-    email: data.email,
-    phone: data.phone,
-    street_type: data.street_type,
-    street: data.street,
-    address_number: data.address_number,
-    address_complement: data.address_complement,
-    district: data.district,
-    postal_code: data.postal_code,
-    city: data.city,
-    state: data.state
-  }
-}
-
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   submitting.value = true
   try {
-    const saved = props.client
-      ? await update(props.client.id, toUpdatePayload(event.data as ClientWritePayload))
-      : await create(event.data as ClientWritePayload)
-    toast.add({ title: props.client ? 'Cliente atualizado' : 'Cliente cadastrado', color: 'success' })
+    const saved = await create(event.data as ClientWritePayload)
+    toast.add({ title: 'Cliente cadastrado', color: 'success' })
     emit('saved', saved)
     isOpen.value = false
   } catch {
@@ -259,49 +193,15 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     submitting.value = false
   }
 }
-
-async function onRefreshPreview() {
-  if (!props.client) return
-  refreshing.value = true
-  try {
-    refreshData.value = await refreshPreview(props.client.id)
-    confirmingRefresh.value = true
-  } catch {
-    toast.add({ title: 'Não foi possível consultar a Receita', color: 'error' })
-  } finally {
-    refreshing.value = false
-  }
-}
-
-async function onConfirmRefresh() {
-  if (!props.client) return
-  refreshing.value = true
-  try {
-    const saved = await refreshCnpj(props.client.id)
-    toast.add({ title: 'Dados atualizados pela Receita', color: 'success' })
-    emit('saved', saved)
-    confirmingRefresh.value = false
-    refreshData.value = null
-    isOpen.value = false
-  } catch {
-    toast.add({ title: 'Não foi possível aplicar a atualização', color: 'error' })
-  } finally {
-    refreshing.value = false
-  }
-}
-
-const refreshEntries = computed(() => {
-  if (!refreshData.value) return []
-  return Object.entries(refreshData.value.changes).map(([field, change]) => ({ field, ...change as { from: unknown, to: unknown } }))
-})
 </script>
 
 <template>
-  <USlideover
+  <UModal
     v-bind="$attrs"
     v-model:open="isOpen"
-    :title="isEditing ? 'Editar cliente' : 'Novo cliente'"
+    title="Novo cliente"
     description="Informe o documento e confirme os dados cadastrais"
+    :ui="{ content: 'sm:max-w-lg' }"
   >
     <template #body>
       <div class="space-y-4">
@@ -311,12 +211,10 @@ const refreshEntries = computed(() => {
             :items="personTypeOptions"
             value-key="value"
             class="w-full"
-            :disabled="isEditing"
           />
         </UFormField>
 
-        <!-- Etapa 1: documento (somente CNPJ novo) -->
-        <template v-if="step === 1 && state.person_type === 'company' && !isEditing">
+        <template v-if="step === 1 && state.person_type === 'company'">
           <UFormField label="CNPJ" name="tax_id" help="Somente números">
             <UInput v-model="state.tax_id" placeholder="00.000.000/0000-00" class="w-full" />
           </UFormField>
@@ -330,7 +228,6 @@ const refreshEntries = computed(() => {
           />
         </template>
 
-        <!-- Etapa 2: formulário -->
         <template v-else>
           <UAlert
             v-if="preview"
@@ -385,33 +282,18 @@ const refreshEntries = computed(() => {
                   {{ [preview.street, preview.address_number, preview.city, preview.state].filter(Boolean).join(', ') || '—' }}
                 </dd>
               </div>
-              <div class="flex justify-between gap-4">
-                <dt class="text-muted">
-                  Atualizado em
-                </dt>
-                <dd class="text-right">
-                  {{ preview.looked_up_at }}
-                </dd>
-              </div>
             </dl>
           </UCard>
 
           <UForm
+            id="client-create-form"
             :schema="schema"
             :state="state as unknown as Partial<Schema>"
             class="space-y-4"
             @submit="onSubmit"
           >
             <UFormField
-              v-if="isEditing"
-              label="Documento"
-              name="tax_id"
-            >
-              <UInput v-model="state.tax_id" class="w-full" disabled />
-            </UFormField>
-
-            <UFormField
-              v-if="!isEditing && state.person_type === 'individual'"
+              v-if="state.person_type === 'individual'"
               label="CPF"
               name="tax_id"
               help="Somente números"
@@ -427,7 +309,7 @@ const refreshEntries = computed(() => {
               <UInput v-model="state.name" placeholder="Nome do cliente" class="w-full" />
             </UFormField>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <UFormField label="Situação" name="status">
                 <USelect
                   v-model="state.status"
@@ -459,7 +341,7 @@ const refreshEntries = computed(() => {
               </UFormField>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <UFormField label="Email" name="email">
                 <UInput
                   v-model="state.email"
@@ -474,15 +356,15 @@ const refreshEntries = computed(() => {
             </div>
 
             <template v-if="state.person_type === 'individual'">
-              <div class="grid grid-cols-3 gap-4">
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <UFormField label="Tipo logradouro" name="street_type">
                   <UInput v-model="state.street_type" class="w-full" />
                 </UFormField>
-                <UFormField label="Logradouro" name="street" class="col-span-2">
+                <UFormField label="Logradouro" name="street" class="sm:col-span-2">
                   <UInput v-model="state.street" class="w-full" />
                 </UFormField>
               </div>
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <UFormField label="Número" name="address_number">
                   <UInput v-model="state.address_number" class="w-full" />
                 </UFormField>
@@ -490,7 +372,7 @@ const refreshEntries = computed(() => {
                   <UInput v-model="state.address_complement" class="w-full" />
                 </UFormField>
               </div>
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <UFormField label="Bairro" name="district">
                   <UInput v-model="state.district" class="w-full" />
                 </UFormField>
@@ -498,8 +380,8 @@ const refreshEntries = computed(() => {
                   <UInput v-model="state.postal_code" class="w-full" />
                 </UFormField>
               </div>
-              <div class="grid grid-cols-3 gap-4">
-                <UFormField label="Cidade" name="city" class="col-span-2">
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <UFormField label="Cidade" name="city" class="sm:col-span-2">
                   <UInput v-model="state.city" class="w-full" />
                 </UFormField>
                 <UFormField label="UF" name="state">
@@ -507,89 +389,33 @@ const refreshEntries = computed(() => {
                 </UFormField>
               </div>
             </template>
-
-            <div class="flex justify-end gap-2 pt-2">
-              <UButton
-                v-if="!isEditing && state.person_type === 'company'"
-                label="Voltar"
-                color="neutral"
-                variant="subtle"
-                type="button"
-                @click="step = 1"
-              />
-              <UButton
-                :label="isEditing ? 'Salvar alterações' : 'Cadastrar cliente'"
-                color="primary"
-                variant="solid"
-                type="submit"
-                :loading="submitting"
-              />
-            </div>
           </UForm>
-
-          <!-- Refresh confirmado (edição de CNPJ) -->
-          <template v-if="isEditing && props.client?.person_type === 'company'">
-            <USeparator />
-            <div class="space-y-2">
-              <UButton
-                label="Atualizar pela Receita"
-                icon="i-lucide-refresh-cw"
-                color="neutral"
-                variant="outline"
-                type="button"
-                :loading="refreshing"
-                @click="onRefreshPreview"
-              />
-              <UAlert
-                v-if="confirmingRefresh && refreshData"
-                color="warning"
-                variant="subtle"
-                title="Alterações encontradas na Receita"
-                description="Confira abaixo e confirme para aplicar."
-              />
-              <ul v-if="confirmingRefresh && refreshEntries.length" class="space-y-1 text-sm">
-                <li v-for="entry in refreshEntries" :key="entry.field" class="flex justify-between gap-4">
-                  <span class="text-muted">{{ entry.field }}</span>
-                  <span>{{ String(entry.from ?? '—') }} → {{ String(entry.to ?? '—') }}</span>
-                </li>
-              </ul>
-              <p v-if="confirmingRefresh && !refreshEntries.length" class="text-sm text-muted">
-                Nenhuma alteração encontrada.
-              </p>
-              <div v-if="confirmingRefresh" class="flex justify-end gap-2">
-                <UButton
-                  label="Descartar"
-                  color="neutral"
-                  variant="subtle"
-                  type="button"
-                  @click="confirmingRefresh = false; refreshData = null"
-                />
-                <UButton
-                  label="Confirmar atualização"
-                  color="warning"
-                  variant="solid"
-                  type="button"
-                  :loading="refreshing"
-                  :disabled="!refreshEntries.length"
-                  @click="onConfirmRefresh"
-                />
-              </div>
-            </div>
-          </template>
         </template>
       </div>
     </template>
 
-    <template #footer>
-      <div class="flex justify-end gap-2">
-        <UButton
-          label="Fechar"
-          color="neutral"
-          variant="subtle"
-          type="button"
-          @click="isOpen = false"
-        />
-      </div>
+    <template #footer="{ close }">
+      <UButton
+        v-if="step === 2 && state.person_type === 'company'"
+        label="Voltar"
+        color="neutral"
+        variant="subtle"
+        type="button"
+        @click="step = 1"
+      />
+      <UButton
+        label="Cancelar"
+        color="neutral"
+        variant="outline"
+        @click="close"
+      />
+      <UButton
+        v-if="step === 2 || state.person_type === 'individual'"
+        label="Cadastrar cliente"
+        type="submit"
+        form="client-create-form"
+        :loading="submitting"
+      />
     </template>
-  </USlideover>
+  </UModal>
 </template>

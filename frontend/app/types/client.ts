@@ -2,6 +2,24 @@ export type ClientPersonType = 'company' | 'individual'
 export type ClientStatus = 'active' | 'inactive'
 export type TaxRegime = 'mei' | 'simple_national' | 'presumed_profit' | 'actual_profit' | 'other' | 'not_applicable'
 export type DeadlineStatus = 'missing' | 'valid' | 'expiring' | 'expired'
+export type ClientTagColor = 'neutral' | 'primary' | 'success' | 'info' | 'warning' | 'error'
+
+export interface ClientTag {
+  id: number
+  name: string
+  color: ClientTagColor
+}
+
+export interface ClientSavedFilter {
+  id: number
+  name: string
+  q: string | null
+  filters: {
+    columnId: string
+    operator: string
+    values: Array<string | number>
+  }[]
+}
 
 export interface ClientCertificate {
   id: number
@@ -19,6 +37,20 @@ export interface ClientEcacPowerOfAttorney {
   expires_at: string
   notes: string | null
   status: DeadlineStatus
+}
+
+export interface ClientSheet {
+  id: number
+  person_type: ClientPersonType | null
+  tax_id: string | null
+  name: string
+  status: ClientStatus
+  tax_regime: TaxRegime | null
+  certificate: { valid_until: string } | null
+  certificate_status: DeadlineStatus
+  ecac_power_of_attorney: { expires_at: string } | null
+  ecac_power_of_attorney_status: DeadlineStatus
+  tags?: ClientTag[]
 }
 
 export interface Client {
@@ -51,6 +83,7 @@ export interface Client {
   certificate_status: DeadlineStatus
   ecac_power_of_attorney: ClientEcacPowerOfAttorney | null
   ecac_power_of_attorney_status: DeadlineStatus
+  tags?: ClientTag[]
   source_updated_at: string | null
   looked_up_at: string | null
   created_at: string
@@ -90,14 +123,68 @@ export interface CnpjRefreshPreview {
   changes: Record<string, { from: unknown, to: unknown }>
 }
 
+export type ClientPortfolioDocument = 'certificate' | 'poa'
+
+export type ClientPortfolioView
+  = | 'certificate_missing'
+    | 'certificate_valid'
+    | 'certificate_expiring'
+    | 'certificate_expired'
+    | 'poa_missing'
+    | 'poa_valid'
+    | 'poa_expiring'
+    | 'poa_expired'
+
+export interface ClientPortfolioSummary {
+  total: number
+  active: number
+  inactive: number
+  certificate: Record<DeadlineStatus, number>
+  poa: Record<DeadlineStatus, number>
+}
+
+export interface PortfolioBucket {
+  key: string
+  count: number
+  label?: string | null
+}
+
+export interface PortfolioAttentionItem {
+  id: number
+  name: string
+  tax_id: string | null
+  status: Extract<DeadlineStatus, 'expired' | 'expiring'>
+  expires_at: string | null
+}
+
+export interface ClientPortfolioAnalytics {
+  by_state: PortfolioBucket[]
+  by_region: PortfolioBucket[]
+  by_city: PortfolioBucket[]
+  by_tax_regime: PortfolioBucket[]
+  by_legal_nature: PortfolioBucket[]
+  by_activity: Array<PortfolioBucket & { label: string | null }>
+  growth_by_month: PortfolioBucket[]
+  attention: {
+    certificate: PortfolioAttentionItem[]
+    poa: PortfolioAttentionItem[]
+  }
+}
+
 export interface ClientListParams {
-  page: number
-  per_page: number
+  page?: number
+  per_page?: number
+  all?: 1
+  sheet?: 1
   q?: string
-  status?: ClientStatus
-  tax_regime?: TaxRegime
-  deadline_status?: DeadlineStatus
-  sort: 'name' | 'tax_id' | 'status' | 'tax_regime' | 'created_at'
+  status?: ClientStatus | ClientStatus[]
+  tax_regime?: TaxRegime | TaxRegime[]
+  deadline_status?: DeadlineStatus | DeadlineStatus[]
+  certificate_status?: DeadlineStatus | DeadlineStatus[]
+  poa_status?: DeadlineStatus | DeadlineStatus[]
+  tag_id?: number | number[]
+  view?: ClientPortfolioView
+  sort: 'name' | 'tax_id' | 'status' | 'tax_regime' | 'created_at' | 'certificate' | 'poa'
   direction: 'asc' | 'desc'
 }
 
@@ -130,5 +217,35 @@ export interface PowerOfAttorneyPayload {
 export interface PaginatedResponse<T> {
   data: T[]
   links: Record<string, string | null>
-  meta: { current_page: number, last_page: number, per_page: number, total: number }
+  meta: {
+    current_page: number
+    last_page: number
+    per_page: number
+    total: number
+    from: number | null
+    to: number | null
+  }
+}
+
+export interface ClientSelectionSnapshot {
+  id: string
+  count: number
+  ids: number[]
+}
+
+export interface ClientBulkDeletion {
+  id: string
+  status: 'queued' | 'completed' | 'failed'
+  total: number
+  deleted?: number
+  skipped?: number
+  failed?: number
+}
+
+export interface ClientTagAssignment {
+  ids?: number[]
+  selection_id?: string
+  excluded_ids?: number[]
+  tag_ids: number[]
+  action: 'attach' | 'detach'
 }

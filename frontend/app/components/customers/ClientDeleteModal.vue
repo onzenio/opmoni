@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import type { Client } from '~/types/client'
-
 defineOptions({ inheritAttrs: false })
 
 const props = defineProps<{
   open: boolean
-  client?: Client | null
+  client?: { id: number, name: string } | null
 }>()
 
 const emit = defineEmits<{

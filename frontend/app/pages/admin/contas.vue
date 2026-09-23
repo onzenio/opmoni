@@ -259,69 +259,69 @@ async function onRename(event: FormSubmitEvent<RenameSchema>) {
       </template>
 
       <div class="flex flex-col gap-4 p-4 sm:p-6">
-    <UTable
-      :data="rows"
-      :columns="columns"
-      :loading="loading"
-      class="shrink-0"
-      :ui="tableUi"
-    >
-      <template #name-cell="{ row }">
-        <p class="font-medium text-highlighted">
-          {{ row.original.name }}
-        </p>
-      </template>
-
-      <template #status-cell="{ row }">
-        <UBadge
-          :color="row.original.status === 'active' ? 'success' : 'error'"
-          variant="subtle"
+        <UTable
+          :data="rows"
+          :columns="columns"
+          :loading="loading"
+          class="shrink-0"
+          :ui="tableUi"
         >
-          {{ row.original.status === 'active' ? 'Ativa' : 'Suspensa' }}
-        </UBadge>
-      </template>
+          <template #name-cell="{ row }">
+            <p class="font-medium text-highlighted">
+              {{ row.original.name }}
+            </p>
+          </template>
 
-      <template #plan-cell="{ row }">
-        {{ row.original.subscription?.plan?.name ?? '—' }}
-      </template>
+          <template #status-cell="{ row }">
+            <UBadge
+              :color="row.original.status === 'active' ? 'success' : 'error'"
+              variant="subtle"
+            >
+              {{ row.original.status === 'active' ? 'Ativa' : 'Suspensa' }}
+            </UBadge>
+          </template>
 
-      <template #members-cell="{ row }">
-        {{ row.original.members_count ?? '—' }}
-      </template>
+          <template #plan-cell="{ row }">
+            {{ row.original.subscription?.plan?.name ?? '—' }}
+          </template>
 
-      <template #actions-cell="{ row }">
-        <div class="text-right">
-          <UDropdownMenu
-            :items="accountActions(row.original)"
-            :content="{ align: 'end' }"
-          >
-            <UButton
-              icon="i-lucide-ellipsis-vertical"
-              color="neutral"
-              variant="ghost"
-              class="ml-auto"
-            />
-          </UDropdownMenu>
+          <template #members-cell="{ row }">
+            {{ row.original.members_count ?? '—' }}
+          </template>
+
+          <template #actions-cell="{ row }">
+            <div class="text-right">
+              <UDropdownMenu
+                :items="accountActions(row.original)"
+                :content="{ align: 'end' }"
+              >
+                <UButton
+                  icon="i-lucide-ellipsis-vertical"
+                  color="neutral"
+                  variant="ghost"
+                  class="ml-auto"
+                />
+              </UDropdownMenu>
+            </div>
+          </template>
+
+          <template #empty>
+            <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
+              <UIcon name="i-lucide-building-2" class="size-6" />
+              <span>Nenhuma conta encontrada.</span>
+            </div>
+          </template>
+        </UTable>
+
+        <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
+          <div class="text-sm text-muted">
+            {{ rows.length }} de {{ total }} conta(s)
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <UPagination v-model:page="page" :total="total" :items-per-page="perPage" />
+          </div>
         </div>
-      </template>
-
-      <template #empty>
-        <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
-          <UIcon name="i-lucide-building-2" class="size-6" />
-          <span>Nenhuma conta encontrada.</span>
-        </div>
-      </template>
-    </UTable>
-
-    <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
-      <div class="text-sm text-muted">
-        {{ rows.length }} de {{ total }} conta(s)
-      </div>
-
-      <div class="flex items-center gap-1.5">
-        <UPagination v-model:page="page" :total="total" :items-per-page="perPage" />
-      </div>
-    </div>
       </div>
     </UPageCard>
   </div>
@@ -330,7 +330,6 @@ async function onRename(event: FormSubmitEvent<RenameSchema>) {
     v-model:open="createOpen"
     title="Nova conta"
     description="Criar uma conta manualmente."
-    :ui="{ footer: 'justify-end' }"
   >
     <template #body>
       <UForm
@@ -402,7 +401,6 @@ async function onRename(event: FormSubmitEvent<RenameSchema>) {
     v-model:open="confirmOpen"
     :title="confirmTarget?.status === 'active' ? 'Suspender conta' : 'Reativar conta'"
     :description="confirmTarget?.status === 'active' ? `${confirmTarget?.name} deixa de acessar o app até ser reativada.` : `${confirmTarget?.name} volta a acessar o app.`"
-    :ui="{ footer: 'justify-end' }"
   >
     <template #footer="{ close }">
       <UButton

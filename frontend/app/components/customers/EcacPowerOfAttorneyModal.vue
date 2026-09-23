@@ -121,7 +121,7 @@ async function onRemove() {
     </template>
 
     <template #footer>
-      <div class="flex justify-between gap-2">
+      <div class="flex w-full justify-between gap-2">
         <UButton
           v-if="client?.ecac_power_of_attorney"
           label="Remover"

@@ -9,12 +9,16 @@ definePageMeta({
 const toast = useToast()
 const { fetchMe, login, user } = useAuth()
 
-if (!user.value && import.meta.client) {
-  await fetchMe().catch(() => {})
-}
-if (user.value) {
-  await navigateTo('/')
-}
+// Client-only e pós-hydration: evita divergência SSR/cliente (mismatch no ULink)
+// e o setup assíncrono (warning do <Suspense>).
+onMounted(async () => {
+  if (!user.value) {
+    await fetchMe().catch(() => {})
+  }
+  if (user.value) {
+    await navigateTo('/')
+  }
+})
 
 const fields: AuthFormField[] = [{
   name: 'email',
@@ -70,10 +74,10 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         @submit="onSubmit"
       >
         <template #password-hint>
-          <ULink to="/login" class="font-medium text-primary">Esqueci a senha</ULink>
+          <ULink to="/login" :active="false" class="font-medium text-primary">Esqueci a senha</ULink>
         </template>
         <template #footer>
-          Não tem conta? <ULink to="/onboarding" class="font-medium text-primary">Comece pelo onboarding</ULink>.
+          Não tem conta? <ULink to="/onboarding" :active="false" class="font-medium text-primary">Comece pelo onboarding</ULink>.
         </template>
       </UAuthForm>
     </UPageCard>

@@ -92,26 +92,16 @@ onMounted(load)
 <template>
   <div class="flex flex-col gap-4 sm:gap-6">
     <UPageGrid class="lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-px">
-      <UPageCard
+      <MetricCard
         v-for="card in cards"
         :key="card.label"
         :icon="card.icon"
         :title="card.label"
         :to="card.to"
-        variant="subtle"
-        :ui="{
-          container: 'gap-y-1.5',
-          wrapper: 'items-start',
-          leading: 'p-2.5 rounded-full bg-primary/10 ring ring-inset ring-primary/25 flex-col',
-          title: 'font-normal text-muted text-xs uppercase'
-        }"
-        class="lg:rounded-none first:rounded-l-lg last:rounded-r-lg hover:z-1"
-      >
-        <span class="text-2xl font-semibold text-highlighted">
-          <USkeleton v-if="loading" class="h-8 w-12" />
-          <template v-else>{{ card.value }}</template>
-        </span>
-      </UPageCard>
+        tone="brand"
+        :loading="loading"
+        :value="card.value"
+      />
     </UPageGrid>
 
     <div>
@@ -128,38 +118,38 @@ onMounted(load)
         :ui="{ container: 'p-0 sm:p-0 gap-y-0', wrapper: 'items-stretch' }"
       >
         <div class="p-4 sm:p-6">
-    <UTable
-      :data="recentLogs"
-      :columns="columns"
-      :loading="loading"
-      class="shrink-0"
-      :ui="tableUi"
-    >
-      <template #created_at-cell="{ row }">
-        {{ new Date(row.original.created_at).toLocaleString('pt-BR') }}
-      </template>
+          <UTable
+            :data="recentLogs"
+            :columns="columns"
+            :loading="loading"
+            class="shrink-0"
+            :ui="tableUi"
+          >
+            <template #created_at-cell="{ row }">
+              {{ new Date(row.original.created_at).toLocaleString('pt-BR') }}
+            </template>
 
-      <template #actor-cell="{ row }">
-        <span class="font-medium text-highlighted">{{ row.original.super_admin?.name ?? '—' }}</span>
-      </template>
+            <template #actor-cell="{ row }">
+              <span class="font-medium text-highlighted">{{ row.original.super_admin?.name ?? '—' }}</span>
+            </template>
 
-      <template #action-cell="{ row }">
-        <UBadge :color="actionMeta(row.original.action).color" variant="subtle">
-          {{ actionMeta(row.original.action).label }}
-        </UBadge>
-      </template>
+            <template #action-cell="{ row }">
+              <UBadge :color="actionMeta(row.original.action).color" variant="subtle">
+                {{ actionMeta(row.original.action).label }}
+              </UBadge>
+            </template>
 
-      <template #account-cell="{ row }">
-        {{ row.original.account?.name ?? '—' }}
-      </template>
+            <template #account-cell="{ row }">
+              {{ row.original.account?.name ?? '—' }}
+            </template>
 
-      <template #empty>
-        <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
-          <UIcon name="i-lucide-scroll-text" class="size-6" />
-          <span>Nenhum acesso de suporte registrado ainda.</span>
-        </div>
-      </template>
-      </UTable>
+            <template #empty>
+              <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
+                <UIcon name="i-lucide-scroll-text" class="size-6" />
+                <span>Nenhum acesso de suporte registrado ainda.</span>
+              </div>
+            </template>
+          </UTable>
         </div>
       </UPageCard>
     </div>

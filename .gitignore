@@ -42,3 +42,7 @@ docker-compose.override.yml
 
 # Worktrees locais (isolamento SDD)
 .worktrees/
+
+# Ferramentas locais (não versionar: config da máquina + licença de skill copiada)
+.impeccable/
+.agents/skills/frontend-design/LICENSE.txt

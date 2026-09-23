@@ -114,62 +114,62 @@ watch(page, load)
       </template>
 
       <div class="flex flex-col gap-4 p-4 sm:p-6">
-    <UTable
-      :data="rows"
-      :columns="columns"
-      :loading="loading"
-      class="shrink-0"
-      :ui="tableUi"
-    >
-      <template #name-cell="{ row }">
-        <p class="font-medium text-highlighted">
-          {{ row.original.name }}
-        </p>
-        <p class="text-muted">
-          {{ row.original.email }}
-        </p>
-      </template>
+        <UTable
+          :data="rows"
+          :columns="columns"
+          :loading="loading"
+          class="shrink-0"
+          :ui="tableUi"
+        >
+          <template #name-cell="{ row }">
+            <p class="font-medium text-highlighted">
+              {{ row.original.name }}
+            </p>
+            <p class="text-muted">
+              {{ row.original.email }}
+            </p>
+          </template>
 
-      <template #type-cell="{ row }">
-        <UBadge v-if="row.original.is_super_admin" color="primary" variant="subtle">
-          Super admin
-        </UBadge>
-        <UBadge v-else color="neutral" variant="subtle">
-          Usuário
-        </UBadge>
-      </template>
+          <template #type-cell="{ row }">
+            <UBadge v-if="row.original.is_super_admin" color="primary" variant="subtle">
+              Super admin
+            </UBadge>
+            <UBadge v-else color="neutral" variant="subtle">
+              Usuário
+            </UBadge>
+          </template>
 
-      <template #accounts-cell="{ row }">
-        <div v-if="row.original.account_links?.length" class="flex flex-wrap gap-1.5">
-          <UBadge
-            v-for="link in row.original.account_links"
-            :key="`${link.account?.id}-${link.role}`"
-            color="neutral"
-            variant="subtle"
-          >
-            {{ link.account?.name ?? '—' }} · {{ link.role }}
-          </UBadge>
+          <template #accounts-cell="{ row }">
+            <div v-if="row.original.account_links?.length" class="flex flex-wrap gap-1.5">
+              <UBadge
+                v-for="link in row.original.account_links"
+                :key="`${link.account?.id}-${link.role}`"
+                color="neutral"
+                variant="subtle"
+              >
+                {{ link.account?.name ?? '—' }} · {{ link.role }}
+              </UBadge>
+            </div>
+            <span v-else class="text-muted">—</span>
+          </template>
+
+          <template #empty>
+            <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
+              <UIcon name="i-lucide-users" class="size-6" />
+              <span>Nenhum usuário encontrado.</span>
+            </div>
+          </template>
+        </UTable>
+
+        <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
+          <div class="text-sm text-muted">
+            {{ rows.length }} de {{ total }} usuário(s)
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <UPagination v-model:page="page" :total="total" :items-per-page="perPage" />
+          </div>
         </div>
-        <span v-else class="text-muted">—</span>
-      </template>
-
-      <template #empty>
-        <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
-          <UIcon name="i-lucide-users" class="size-6" />
-          <span>Nenhum usuário encontrado.</span>
-        </div>
-      </template>
-    </UTable>
-
-    <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
-      <div class="text-sm text-muted">
-        {{ rows.length }} de {{ total }} usuário(s)
-      </div>
-
-      <div class="flex items-center gap-1.5">
-        <UPagination v-model:page="page" :total="total" :items-per-page="perPage" />
-      </div>
-    </div>
       </div>
     </UPageCard>
   </div>

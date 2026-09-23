@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
+import { monitoringSidebarChildren } from '~/utils/monitoringNav'
 
 const route = useRoute()
 const toast = useToast()
@@ -24,9 +25,30 @@ const links = [[{
     open.value = false
   }
 }, {
-  label: 'Customers',
+  label: 'Clientes',
   icon: 'i-lucide-users',
   to: '/customers',
+  defaultOpen: true,
+  type: 'trigger',
+  children: [{
+    label: 'Painel',
+    to: '/customers/painel',
+    exact: true,
+    onSelect: () => {
+      open.value = false
+    }
+  }, {
+    label: 'Meus clientes',
+    to: '/customers/certificados',
+    onSelect: () => {
+      open.value = false
+    }
+  }]
+}, {
+  label: 'Monitoramento',
+  icon: 'i-lucide-radar',
+  to: '/monitoring',
+  type: 'trigger',
   onSelect: () => {
     open.value = false
   }
@@ -75,7 +97,39 @@ const links = [[{
 }]] satisfies NavigationMenuItem[][]
 
 const navLinks = computed<NavigationMenuItem[][]>(() => {
-  const main: NavigationMenuItem[] = [...(links[0] ?? [])]
+  const close = () => {
+    open.value = false
+  }
+  const main: NavigationMenuItem[] = (links[0] ?? []).map((item) => {
+    if (item.label === 'Clientes') {
+      return {
+        ...item,
+        children: [{
+          label: 'Painel',
+          to: '/customers/painel',
+          exact: true,
+          active: route.path === '/customers/painel',
+          onSelect: close
+        }, {
+          label: 'Meus clientes',
+          to: '/customers/certificados',
+          active: route.path.startsWith('/customers/certificados') || route.path.startsWith('/customers/procuracao'),
+          onSelect: close
+        }]
+      }
+    }
+    if (item.label === 'Monitoramento') {
+      return {
+        ...item,
+        defaultOpen: route.path.startsWith('/monitoring'),
+        children: monitoringSidebarChildren(route.path).map(child => ({
+          ...child,
+          onSelect: close
+        }))
+      }
+    }
+    return item
+  })
   if (isSuperAdmin.value) {
     const close = () => {
       open.value = false

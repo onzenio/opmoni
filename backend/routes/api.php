@@ -9,14 +9,19 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SupportAccessController;
 use App\Http\Controllers\Tenant\AccountMemberController;
 use App\Http\Controllers\Tenant\AccountSwitchController;
+use App\Http\Controllers\Tenant\ClientBulkDeletionController;
 use App\Http\Controllers\Tenant\ClientCertificateController;
 use App\Http\Controllers\Tenant\ClientCnpjLookupController;
 use App\Http\Controllers\Tenant\ClientCnpjRefreshController;
 use App\Http\Controllers\Tenant\ClientController;
 use App\Http\Controllers\Tenant\ClientEcacPowerOfAttorneyController;
+use App\Http\Controllers\Tenant\ClientSavedFilterController;
+use App\Http\Controllers\Tenant\ClientSelectionController;
+use App\Http\Controllers\Tenant\ClientTagAssignmentController;
 use App\Http\Controllers\Tenant\DocumentController;
 use App\Http\Controllers\Tenant\ProcessController;
 use App\Http\Controllers\Tenant\SerproMonitoringController;
+use App\Http\Controllers\Tenant\TagController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -32,6 +37,17 @@ Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
 Route::post('/account/switch', AccountSwitchController::class)->middleware('auth:sanctum');
 
 Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
+    Route::get('clients/summary', [ClientController::class, 'summary']);
+    Route::get('clients/analytics', [ClientController::class, 'analytics']);
+    Route::post('clients/tags', [ClientTagAssignmentController::class, 'store']);
+    Route::apiResource('tags', TagController::class)->except(['show']);
+    Route::get('clients/saved-filters', [ClientSavedFilterController::class, 'index']);
+    Route::post('clients/saved-filters', [ClientSavedFilterController::class, 'store']);
+    Route::delete('clients/saved-filters/{savedFilter}', [ClientSavedFilterController::class, 'destroy']);
+    Route::post('clients/selections', [ClientSelectionController::class, 'store']);
+    Route::post('clients/selections/{selection}/presence', [ClientSelectionController::class, 'presence']);
+    Route::post('clients/bulk-deletions', [ClientBulkDeletionController::class, 'store']);
+    Route::get('clients/bulk-deletions/{bulkDeletion}', [ClientBulkDeletionController::class, 'show']);
     Route::post('clients/cnpj-lookup', ClientCnpjLookupController::class);
     Route::post('clients/{client}/cnpj-refresh-preview', [ClientCnpjRefreshController::class, 'preview']);
     Route::post('clients/{client}/cnpj-refresh', [ClientCnpjRefreshController::class, 'update']);

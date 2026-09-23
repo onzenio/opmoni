@@ -14,7 +14,11 @@ export default defineNuxtConfig({
 
   // NUXT_PUBLIC_API_URL sobrescreve este default automaticamente (runtime config).
   runtimeConfig: {
-    public: { apiUrl: 'http://localhost:8000' }
+    apiUrl: 'http://localhost:8000',
+    public: {
+      apiUrl: 'http://localhost:8000',
+      siteUrl: 'http://localhost:3000'
+    }
   },
 
   routeRules: {

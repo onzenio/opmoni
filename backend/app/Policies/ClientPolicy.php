@@ -35,6 +35,16 @@ class ClientPolicy
             && $this->isTenantModel($client->account_id);
     }
 
+    public function bulkDelete(User $user): bool
+    {
+        return in_array($this->tenantRole($user), ['admin', 'operador'], true);
+    }
+
+    public function categorize(User $user): bool
+    {
+        return in_array($this->tenantRole($user), ['admin', 'operador'], true);
+    }
+
     private function isTenantModel(int $accountId): bool
     {
         return resolve(CurrentTenant::class)->accountId === $accountId;

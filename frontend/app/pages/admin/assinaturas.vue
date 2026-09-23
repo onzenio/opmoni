@@ -179,62 +179,62 @@ async function onSave(event: FormSubmitEvent<EditSchema>) {
       </template>
 
       <div class="flex flex-col gap-4 p-4 sm:p-6">
-    <UTable
-      :data="rows"
-      :columns="columns"
-      :loading="loading"
-      class="shrink-0"
-      :ui="tableUi"
-    >
-      <template #account-cell="{ row }">
-        <p class="font-medium text-highlighted">
-          {{ row.original.account?.name ?? `#${row.original.id}` }}
-        </p>
-      </template>
+        <UTable
+          :data="rows"
+          :columns="columns"
+          :loading="loading"
+          class="shrink-0"
+          :ui="tableUi"
+        >
+          <template #account-cell="{ row }">
+            <p class="font-medium text-highlighted">
+              {{ row.original.account?.name ?? `#${row.original.id}` }}
+            </p>
+          </template>
 
-      <template #plan-cell="{ row }">
-        {{ row.original.plan?.name ?? '—' }}
-      </template>
+          <template #plan-cell="{ row }">
+            {{ row.original.plan?.name ?? '—' }}
+          </template>
 
-      <template #status-cell="{ row }">
-        <UBadge :color="STATUS_META[row.original.status].color" variant="subtle">
-          {{ STATUS_META[row.original.status].label }}
-        </UBadge>
-      </template>
+          <template #status-cell="{ row }">
+            <UBadge :color="STATUS_META[row.original.status].color" variant="subtle">
+              {{ STATUS_META[row.original.status].label }}
+            </UBadge>
+          </template>
 
-      <template #actions-cell="{ row }">
-        <div class="text-right">
-          <UDropdownMenu
-            :items="subscriptionActions(row.original)"
-            :content="{ align: 'end' }"
-          >
-            <UButton
-              icon="i-lucide-ellipsis-vertical"
-              color="neutral"
-              variant="ghost"
-              class="ml-auto"
-            />
-          </UDropdownMenu>
+          <template #actions-cell="{ row }">
+            <div class="text-right">
+              <UDropdownMenu
+                :items="subscriptionActions(row.original)"
+                :content="{ align: 'end' }"
+              >
+                <UButton
+                  icon="i-lucide-ellipsis-vertical"
+                  color="neutral"
+                  variant="ghost"
+                  class="ml-auto"
+                />
+              </UDropdownMenu>
+            </div>
+          </template>
+
+          <template #empty>
+            <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
+              <UIcon name="i-lucide-receipt" class="size-6" />
+              <span>Nenhuma assinatura encontrada.</span>
+            </div>
+          </template>
+        </UTable>
+
+        <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
+          <div class="text-sm text-muted">
+            {{ rows.length }} de {{ total }} assinatura(s)
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <UPagination v-model:page="page" :total="total" :items-per-page="perPage" />
+          </div>
         </div>
-      </template>
-
-      <template #empty>
-        <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
-          <UIcon name="i-lucide-receipt" class="size-6" />
-          <span>Nenhuma assinatura encontrada.</span>
-        </div>
-      </template>
-    </UTable>
-
-    <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
-      <div class="text-sm text-muted">
-        {{ rows.length }} de {{ total }} assinatura(s)
-      </div>
-
-      <div class="flex items-center gap-1.5">
-        <UPagination v-model:page="page" :total="total" :items-per-page="perPage" />
-      </div>
-    </div>
       </div>
     </UPageCard>
   </div>

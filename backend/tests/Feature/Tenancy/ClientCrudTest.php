@@ -249,14 +249,28 @@ class ClientCrudTest extends TestCase
         $account = Account::factory()->create();
         $a = Client::factory()->individual()->create(['account_id' => $account->id, 'name' => 'Alpha', 'tax_id' => '52998224725']);
         Client::factory()->company()->create(['account_id' => $account->id, 'name' => 'Zulu', 'trade_name' => 'Loja Azul', 'status' => 'inactive']);
+        Client::factory()->count(24)->create(['account_id' => $account->id, 'name' => 'Middle']);
         Client::factory()->individual()->create(['name' => 'Alpha Alheio']);
         $this->actingAs($this->memberOf($account), 'sanctum');
-        $this->getJson('/api/clients?per_page=1&sort=name&direction=desc&page=2')->assertOk()
-            ->assertJsonPath('meta.total', 2)->assertJsonPath('meta.current_page', 2)->assertJsonPath('data.0.id', $a->id);
+        $this->getJson('/api/clients?per_page=25&sort=name&direction=desc&page=2')->assertOk()
+            ->assertJsonPath('meta.total', 26)->assertJsonPath('meta.current_page', 2)->assertJsonPath('data.0.id', $a->id);
         $this->getJson('/api/clients?q=Alpha&status=active&tax_regime=not_applicable')->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $a->id);
         $this->getJson('/api/clients?q=529.982.247-25')->assertOk()->assertJsonPath('data.0.id', $a->id);
         $this->getJson('/api/clients?q=Azul')->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.name', 'Zulu');
         $this->getJson('/api/clients?status=inactive&tax_regime=not_applicable')->assertOk()->assertJsonPath('meta.total', 0);
+    }
+
+    public function test_index_returns_the_full_portfolio_when_all_is_requested(): void
+    {
+        $account = Account::factory()->create();
+        Client::factory()->count(30)->create(['account_id' => $account->id, 'name' => 'Carteira']);
+        Client::factory()->create(['name' => 'Outra conta']);
+        $this->actingAs($this->memberOf($account), 'sanctum');
+
+        $response = $this->getJson('/api/clients?all=1&sort=name')->assertOk()
+            ->assertJsonCount(30, 'data')
+            ->assertJsonPath('meta.total', 30);
+        $this->assertArrayNotHasKey('current_page', $response->json('meta'));
     }
 
     #[DataProvider('invalidIndexQueries')]
@@ -269,8 +283,8 @@ class ClientCrudTest extends TestCase
     public static function invalidIndexQueries(): array
     {
         return [['sort=account_id', 'sort'], ['direction=sideways', 'direction'], ['per_page=101', 'per_page'],
-            ['per_page=0', 'per_page'], ['page=0', 'page'], ['status=bad', 'status'],
-            ['tax_regime=bad', 'tax_regime']];
+            ['per_page=15', 'per_page'], ['per_page=1', 'per_page'], ['per_page=0', 'per_page'],
+            ['page=0', 'page'], ['status=bad', 'status'], ['tax_regime=bad', 'tax_regime']];
     }
 
     private function memberOf(Account $account, string $role = 'operador'): User

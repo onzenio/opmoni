@@ -56,6 +56,11 @@ class ClientResource extends JsonResource
             'ecac_power_of_attorney_status' => resolve(DeadlineState::class)->for($this->ecacPowerOfAttorney?->expires_at)->value,
             'source_updated_at' => $this->source_updated_at?->toISOString(),
             'looked_up_at' => $this->looked_up_at?->toISOString(),
+            'tags' => $this->whenLoaded('tags', fn () => $this->tags->map(fn ($tag) => [
+                'id' => $tag->id,
+                'name' => $tag->name,
+                'color' => $tag->color,
+            ])->values()),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

@@ -246,54 +246,54 @@ function actionMeta(action: string) {
       </div>
 
       <div v-else class="flex flex-col gap-4 p-4 sm:p-6">
-    <UTable
-      :data="logs"
-      :columns="logColumns"
-      :loading="loadingLogs"
-      class="shrink-0"
-      :ui="tableUi"
-    >
-      <template #created-cell="{ row }">
-        {{ new Date(row.original.created_at).toLocaleString('pt-BR') }}
-      </template>
+        <UTable
+          :data="logs"
+          :columns="logColumns"
+          :loading="loadingLogs"
+          class="shrink-0"
+          :ui="tableUi"
+        >
+          <template #created-cell="{ row }">
+            {{ new Date(row.original.created_at).toLocaleString('pt-BR') }}
+          </template>
 
-      <template #actor-cell="{ row }">
-        <p class="font-medium text-highlighted">
-          {{ row.original.super_admin?.name ?? '—' }}
-        </p>
-      </template>
+          <template #actor-cell="{ row }">
+            <p class="font-medium text-highlighted">
+              {{ row.original.super_admin?.name ?? '—' }}
+            </p>
+          </template>
 
-      <template #account-cell="{ row }">
-        {{ row.original.account?.name ?? '—' }}
-      </template>
+          <template #account-cell="{ row }">
+            {{ row.original.account?.name ?? '—' }}
+          </template>
 
-      <template #action-cell="{ row }">
-        <UBadge :color="actionMeta(row.original.action).color" variant="subtle">
-          {{ actionMeta(row.original.action).label }}
-        </UBadge>
-      </template>
+          <template #action-cell="{ row }">
+            <UBadge :color="actionMeta(row.original.action).color" variant="subtle">
+              {{ actionMeta(row.original.action).label }}
+            </UBadge>
+          </template>
 
-      <template #ip-cell="{ row }">
-        <span class="text-muted">{{ row.original.ip ?? '—' }}</span>
-      </template>
+          <template #ip-cell="{ row }">
+            <span class="text-muted">{{ row.original.ip ?? '—' }}</span>
+          </template>
 
-      <template #empty>
-        <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
-          <UIcon name="i-lucide-scroll-text" class="size-6" />
-          <span>Nenhum evento encontrado.</span>
+          <template #empty>
+            <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
+              <UIcon name="i-lucide-scroll-text" class="size-6" />
+              <span>Nenhum evento encontrado.</span>
+            </div>
+          </template>
+        </UTable>
+
+        <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
+          <div class="text-sm text-muted">
+            {{ logsTotal }} evento(s)
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <UPagination v-model:page="logsPage" :total="logsTotal" :items-per-page="logsPerPage" />
+          </div>
         </div>
-      </template>
-    </UTable>
-
-    <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
-      <div class="text-sm text-muted">
-        {{ logsTotal }} evento(s)
-      </div>
-
-      <div class="flex items-center gap-1.5">
-        <UPagination v-model:page="logsPage" :total="logsTotal" :items-per-page="logsPerPage" />
-      </div>
-    </div>
       </div>
     </UPageCard>
   </div>

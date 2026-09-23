@@ -140,92 +140,92 @@ async function onSave(event: FormSubmitEvent<EditSchema>) {
       </template>
 
       <div class="flex flex-col gap-4 p-4 sm:p-6">
-    <UTable
-      :data="rows"
-      :columns="columns"
-      :loading="loading"
-      class="shrink-0"
-      :ui="tableUi"
-    >
-      <template #name-cell="{ row }">
-        <p class="font-medium text-highlighted">
-          {{ row.original.name }}
-        </p>
-        <p class="text-muted">
-          {{ row.original.slug }}
-        </p>
-      </template>
+        <UTable
+          :data="rows"
+          :columns="columns"
+          :loading="loading"
+          class="shrink-0"
+          :ui="tableUi"
+        >
+          <template #name-cell="{ row }">
+            <p class="font-medium text-highlighted">
+              {{ row.original.name }}
+            </p>
+            <p class="text-muted">
+              {{ row.original.slug }}
+            </p>
+          </template>
 
-      <template #users-header>
-        <div class="text-right">
-          Usuários
-        </div>
-      </template>
-      <template #clients-header>
-        <div class="text-right">
-          Clientes
-        </div>
-      </template>
-      <template #monitorings-header>
-        <div class="text-right">
-          Monitoramentos
-        </div>
-      </template>
+          <template #users-header>
+            <div class="text-right">
+              Usuários
+            </div>
+          </template>
+          <template #clients-header>
+            <div class="text-right">
+              Clientes
+            </div>
+          </template>
+          <template #monitorings-header>
+            <div class="text-right">
+              Monitoramentos
+            </div>
+          </template>
 
-      <template #users-cell="{ row }">
-        <div class="text-right">
-          <UBadge v-if="limitValue(row.original, 'users') === null" color="neutral" variant="subtle">
-            Ilimitado
-          </UBadge>
-          <span v-else class="font-medium text-highlighted tabular-nums">{{ limitValue(row.original, 'users') }}</span>
-        </div>
-      </template>
-      <template #clients-cell="{ row }">
-        <div class="text-right">
-          <UBadge v-if="limitValue(row.original, 'clients') === null" color="neutral" variant="subtle">
-            Ilimitado
-          </UBadge>
-          <span v-else class="font-medium text-highlighted tabular-nums">{{ limitValue(row.original, 'clients') }}</span>
-        </div>
-      </template>
-      <template #monitorings-cell="{ row }">
-        <div class="text-right">
-          <UBadge v-if="limitValue(row.original, 'monitorings') === null" color="neutral" variant="subtle">
-            Ilimitado
-          </UBadge>
-          <span v-else class="font-medium text-highlighted tabular-nums">{{ limitValue(row.original, 'monitorings') }}</span>
-        </div>
-      </template>
+          <template #users-cell="{ row }">
+            <div class="text-right">
+              <UBadge v-if="limitValue(row.original, 'users') === null" color="neutral" variant="subtle">
+                Ilimitado
+              </UBadge>
+              <span v-else class="font-medium text-highlighted tabular-nums">{{ limitValue(row.original, 'users') }}</span>
+            </div>
+          </template>
+          <template #clients-cell="{ row }">
+            <div class="text-right">
+              <UBadge v-if="limitValue(row.original, 'clients') === null" color="neutral" variant="subtle">
+                Ilimitado
+              </UBadge>
+              <span v-else class="font-medium text-highlighted tabular-nums">{{ limitValue(row.original, 'clients') }}</span>
+            </div>
+          </template>
+          <template #monitorings-cell="{ row }">
+            <div class="text-right">
+              <UBadge v-if="limitValue(row.original, 'monitorings') === null" color="neutral" variant="subtle">
+                Ilimitado
+              </UBadge>
+              <span v-else class="font-medium text-highlighted tabular-nums">{{ limitValue(row.original, 'monitorings') }}</span>
+            </div>
+          </template>
 
-      <template #actions-cell="{ row }">
-        <div class="text-right">
-          <UDropdownMenu
-            :items="planActions(row.original)"
-            :content="{ align: 'end' }"
-          >
-            <UButton
-              icon="i-lucide-ellipsis-vertical"
-              color="neutral"
-              variant="ghost"
-              class="ml-auto"
-            />
-          </UDropdownMenu>
-        </div>
-      </template>
+          <template #actions-cell="{ row }">
+            <div class="text-right">
+              <UDropdownMenu
+                :items="planActions(row.original)"
+                :content="{ align: 'end' }"
+              >
+                <UButton
+                  icon="i-lucide-ellipsis-vertical"
+                  color="neutral"
+                  variant="ghost"
+                  class="ml-auto"
+                />
+              </UDropdownMenu>
+            </div>
+          </template>
 
-      <template #empty>
-        <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
-          <UIcon name="i-lucide-layers" class="size-6" />
-          <span>Nenhum plano encontrado.</span>
-        </div>
-      </template>
-    </UTable>
+          <template #empty>
+            <div class="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted">
+              <UIcon name="i-lucide-layers" class="size-6" />
+              <span>Nenhum plano encontrado.</span>
+            </div>
+          </template>
+        </UTable>
 
-    <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
-      <div class="text-sm text-muted">
-        {{ rows.length }} de {{ plans.length }} plano(s)
-      </div>
-    </div>
+        <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
+          <div class="text-sm text-muted">
+            {{ rows.length }} de {{ plans.length }} plano(s)
+          </div>
+        </div>
       </div>
     </UPageCard>
   </div>

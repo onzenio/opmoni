@@ -7,6 +7,7 @@ use App\Models\AccountUser;
 use App\Models\Client;
 use App\Models\ClientCertificate;
 use App\Models\ClientEcacPowerOfAttorney;
+use App\Models\Tag;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -126,11 +127,51 @@ class ClientEcacPowerOfAttorneyTest extends TestCase
         CarbonImmutable::setTestNow();
     }
 
+    public function test_index_supports_portfolio_view_filters(): void
+    {
+        CarbonImmutable::setTestNow('2026-09-22 12:00:00');
+        $account = Account::factory()->create();
+        $plain = Client::factory()->individual()->create(['account_id' => $account->getKey(), 'name' => 'Sem documento']);
+        $expiring = Client::factory()->individual()->create(['account_id' => $account->getKey(), 'name' => 'Certificado a vencer']);
+        $valid = Client::factory()->individual()->create(['account_id' => $account->getKey(), 'name' => 'Certificado válido']);
+        $expired = Client::factory()->individual()->create(['account_id' => $account->getKey(), 'name' => 'Certificado vencido']);
+        $poa = Client::factory()->individual()->create(['account_id' => $account->getKey(), 'name' => 'Só procuração']);
+        ClientCertificate::factory()->create(['account_id' => $account->getKey(), 'client_id' => $expiring->getKey(), 'valid_from' => '2026-01-01', 'valid_until' => '2026-10-10']);
+        ClientCertificate::factory()->create(['account_id' => $account->getKey(), 'client_id' => $valid->getKey(), 'valid_from' => '2026-01-01', 'valid_until' => '2027-06-01']);
+        ClientCertificate::factory()->create(['account_id' => $account->getKey(), 'client_id' => $expired->getKey(), 'valid_from' => '2026-01-01', 'valid_until' => '2026-09-10']);
+        ClientEcacPowerOfAttorney::factory()->create(['account_id' => $account->getKey(), 'client_id' => $poa->getKey(), 'starts_at' => '2026-01-01', 'expires_at' => '2027-06-01']);
+        $this->actingAs($this->memberOf($account, 'operador'), 'sanctum');
+
+        $ids = fn (string $view): array => $this->getJson("/api/clients?view={$view}")->assertOk()->json('data.*.id');
+
+        $this->assertEqualsCanonicalizing([$plain->getKey(), $poa->getKey()], $ids('certificate_missing'));
+        $this->assertEqualsCanonicalizing([$valid->getKey()], $ids('certificate_valid'));
+        $this->assertEqualsCanonicalizing([$expiring->getKey()], $ids('certificate_expiring'));
+        $this->assertEqualsCanonicalizing([$expired->getKey()], $ids('certificate_expired'));
+        $this->assertEqualsCanonicalizing([$poa->getKey()], $ids('poa_valid'));
+        $this->assertEqualsCanonicalizing([], $ids('poa_expiring'));
+        $this->assertEqualsCanonicalizing([], $ids('poa_expired'));
+        $this->assertEqualsCanonicalizing(
+            [$plain->getKey(), $expiring->getKey(), $valid->getKey(), $expired->getKey()],
+            $ids('poa_missing')
+        );
+        $this->getJson('/api/clients/summary')->assertOk()->assertJsonPath('data', [
+            'total' => 5,
+            'active' => 5,
+            'inactive' => 0,
+            'certificate' => ['missing' => 2, 'valid' => 1, 'expiring' => 1, 'expired' => 1],
+            'poa' => ['missing' => 4, 'valid' => 1, 'expiring' => 0, 'expired' => 0],
+        ]);
+        $this->getJson('/api/clients?view=bogus')->assertUnprocessable()->assertJsonValidationErrors('view');
+
+        CarbonImmutable::setTestNow();
+    }
+
     public function test_client_responses_include_fiscal_statuses_without_n_plus_one(): void
     {
         $account = Account::factory()->create();
-        $clients = Client::factory()->individual()->count(6)->create(['account_id' => $account->getKey()]);
-        foreach ($clients as $client) {
+        $clients = Client::factory()->individual()->count(50)->create(['account_id' => $account->getKey()]);
+        foreach ($clients->take(6) as $client) {
             ClientEcacPowerOfAttorney::factory()->create([
                 'account_id' => $account->getKey(), 'client_id' => $client->getKey(),
             ]);
@@ -149,7 +190,87 @@ class ClientEcacPowerOfAttorneyTest extends TestCase
             return $total;
         };
 
-        $this->assertSame($countFor(3), $countFor(6));
+        $this->assertSame($countFor(25), $countFor(50));
+    }
+
+    public function test_index_filters_columns_and_sorts_certificate_and_power_of_attorney(): void
+    {
+        CarbonImmutable::setTestNow('2026-09-22 12:00:00');
+        $account = Account::factory()->create();
+        $early = Client::factory()->individual()->create(['account_id' => $account->getKey(), 'name' => 'Beta']);
+        $late = Client::factory()->individual()->create(['account_id' => $account->getKey(), 'name' => 'Alpha']);
+        $missing = Client::factory()->individual()->create(['account_id' => $account->getKey(), 'name' => 'Zulu']);
+        ClientCertificate::factory()->create([
+            'account_id' => $account->getKey(), 'client_id' => $early->getKey(),
+            'valid_from' => '2026-01-01', 'valid_until' => '2026-09-01',
+        ]);
+        ClientCertificate::factory()->create([
+            'account_id' => $account->getKey(), 'client_id' => $late->getKey(),
+            'valid_from' => '2026-01-01', 'valid_until' => '2027-06-01',
+        ]);
+        ClientCertificate::factory()->create([
+            'account_id' => $account->getKey(), 'client_id' => $missing->getKey(),
+            'valid_from' => '2020-01-01', 'valid_until' => '2020-06-01', 'replaced_at' => '2026-01-01',
+        ]);
+        ClientEcacPowerOfAttorney::factory()->create([
+            'account_id' => $account->getKey(), 'client_id' => $early->getKey(),
+            'starts_at' => '2026-01-01', 'expires_at' => '2026-08-01',
+        ]);
+        ClientEcacPowerOfAttorney::factory()->create([
+            'account_id' => $account->getKey(), 'client_id' => $late->getKey(),
+            'starts_at' => '2026-01-01', 'expires_at' => '2028-01-01',
+        ]);
+        $tag = Tag::factory()->create(['account_id' => $account->getKey(), 'name' => 'Prioridade']);
+        $early->tags()->attach($tag->getKey(), ['account_id' => $account->getKey()]);
+        $foreign = Tag::factory()->create();
+        $this->actingAs($this->memberOf($account), 'sanctum');
+
+        $this->getJson('/api/clients?sort=certificate&direction=asc')->assertOk()
+            ->assertJsonPath('data.0.id', $early->getKey())
+            ->assertJsonPath('data.1.id', $late->getKey())
+            ->assertJsonPath('data.2.id', $missing->getKey());
+        $this->getJson('/api/clients?sort=certificate&direction=desc')->assertOk()
+            ->assertJsonPath('data.0.id', $late->getKey())
+            ->assertJsonPath('data.1.id', $early->getKey())
+            ->assertJsonPath('data.2.id', $missing->getKey());
+        $this->getJson('/api/clients?sort=poa&direction=asc')->assertOk()
+            ->assertJsonPath('data.0.id', $early->getKey())
+            ->assertJsonPath('data.1.id', $late->getKey())
+            ->assertJsonPath('data.2.id', $missing->getKey());
+        $this->getJson('/api/clients?certificate_status=missing')->assertOk()
+            ->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $missing->getKey());
+        $this->getJson('/api/clients?poa_status=valid')->assertOk()
+            ->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $late->getKey());
+        $this->getJson('/api/clients?tag_id='.$tag->getKey())->assertOk()
+            ->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $early->getKey());
+        $this->getJson('/api/clients?tag_id='.$foreign->getKey())->assertUnprocessable()
+            ->assertJsonValidationErrors('tag_id');
+        $this->getJson('/api/clients?sort=valid_until')->assertUnprocessable()
+            ->assertJsonValidationErrors('sort');
+
+        CarbonImmutable::setTestNow();
+    }
+
+    public function test_selection_snapshot_follows_the_portfolio_view_inside_the_tenant(): void
+    {
+        CarbonImmutable::setTestNow('2026-09-22 12:00:00');
+        $account = Account::factory()->create();
+        $other = Account::factory()->create();
+        Client::factory()->individual()->create(['account_id' => $account->getKey(), 'name' => 'Sem']);
+        $valid = Client::factory()->individual()->create(['account_id' => $account->getKey(), 'name' => 'Com']);
+        ClientCertificate::factory()->create([
+            'account_id' => $account->getKey(), 'client_id' => $valid->getKey(),
+            'valid_from' => '2026-01-01', 'valid_until' => '2027-06-01',
+        ]);
+        Client::factory()->individual()->create(['account_id' => $other->getKey(), 'name' => 'Alheio']);
+        $this->actingAs($this->memberOf($account), 'sanctum');
+
+        $this->postJson('/api/clients/selections', ['view' => 'certificate_missing'])->assertOk()
+            ->assertJsonPath('data.count', 1);
+        $this->postJson('/api/clients/selections', ['view' => 'certificate_valid'])->assertOk()
+            ->assertJsonPath('data.count', 1);
+
+        CarbonImmutable::setTestNow();
     }
 
     public function test_client_soft_delete_removes_active_ciphertext(): void

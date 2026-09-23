@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -85,6 +86,13 @@ class Client extends Model
         return $this->hasOne(ClientEcacPowerOfAttorney::class);
     }
 
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class, 'client_tag')
+            ->withPivot('account_id')
+            ->orderBy('tags.name');
+    }
+
     public function scopeSearch(Builder $query, ?string $term): Builder
     {
         return $query->when($term, function (Builder $query, string $term): Builder {
@@ -104,22 +112,73 @@ class Client extends Model
         });
     }
 
-    public function scopeWithStatus(Builder $query, ?string $status): Builder
+    public function scopeWithStatus(Builder $query, string|array|null $status): Builder
     {
-        return $query->when($status, fn (Builder $query, string $status): Builder => $query->where('status', $status));
+        $statuses = $this->stringList($status);
+
+        return $statuses === [] ? $query : $query->whereIn('status', $statuses);
     }
 
-    public function scopeWithTaxRegime(Builder $query, ?string $regime): Builder
+    public function scopeWithTaxRegime(Builder $query, string|array|null $regime): Builder
     {
-        return $query->when($regime, fn (Builder $query, string $regime): Builder => $query->where('tax_regime', $regime));
+        $regimes = $this->stringList($regime);
+
+        return $regimes === [] ? $query : $query->whereIn('tax_regime', $regimes);
     }
 
-    public function scopeWithDeadlineStatus(Builder $query, ?string $status): Builder
+    public function scopeWithTag(Builder $query, int|string|array|null $tagId): Builder
     {
-        if ($status === null) {
-            return $query;
-        }
+        $ids = $this->idList($tagId);
 
+        return $ids === [] ? $query : $query->whereHas(
+            'tags',
+            fn (Builder $tags): Builder => $tags->whereKey($ids),
+        );
+    }
+
+    public function scopeWithCertificateStatus(Builder $query, string|array|null $status): Builder
+    {
+        return $this->whereAnyOf($query, $this->stringList($status), function (Builder $query, string $status): void {
+            $this->applyDocumentStatus($query, 'currentCertificate', 'valid_until', $status);
+        });
+    }
+
+    public function scopeWithPoaStatus(Builder $query, string|array|null $status): Builder
+    {
+        return $this->whereAnyOf($query, $this->stringList($status), function (Builder $query, string $status): void {
+            $this->applyDocumentStatus($query, 'ecacPowerOfAttorney', 'expires_at', $status);
+        });
+    }
+
+    public function scopeOrderByCurrentCertificate(Builder $query, string $direction): Builder
+    {
+        return $this->orderByDateSubquery($query, ClientCertificate::query()
+            ->select('valid_until')
+            ->whereColumn('client_certificates.client_id', 'clients.id')
+            ->whereNull('client_certificates.replaced_at')
+            ->whereNull('client_certificates.removed_at')
+            ->orderByDesc('client_certificates.id')
+            ->limit(1), $direction);
+    }
+
+    public function scopeOrderByPowerOfAttorney(Builder $query, string $direction): Builder
+    {
+        return $this->orderByDateSubquery($query, ClientEcacPowerOfAttorney::query()
+            ->select('expires_at')
+            ->whereColumn('client_ecac_powers_of_attorney.client_id', 'clients.id')
+            ->orderByDesc('client_ecac_powers_of_attorney.id')
+            ->limit(1), $direction);
+    }
+
+    public function scopeWithDeadlineStatus(Builder $query, string|array|null $status): Builder
+    {
+        return $this->whereAnyOf($query, $this->stringList($status), function (Builder $query, string $status): void {
+            $this->applyCombinedDeadlineStatus($query, $status);
+        });
+    }
+
+    private function applyCombinedDeadlineStatus(Builder $query, string $status): void
+    {
         $today = now()->startOfDay();
         $limit = $today->copy()->addDays(30)->endOfDay();
         // Day-precision boundaries mirror DeadlineState (startOfDay today, +30d): whereDate/whereBetween/where(>, endOfDay) match expired/expiring/valid.
@@ -131,13 +190,139 @@ class Client extends Model
         };
 
         if ($status === DeadlineStatus::Missing->value) {
-            return $query->where(fn (Builder $query): Builder => $query
+            $query->where(fn (Builder $query): Builder => $query
                 ->whereDoesntHave('currentCertificate')
                 ->orWhereDoesntHave('ecacPowerOfAttorney'));
+
+            return;
         }
 
-        return $query->where(fn (Builder $query): Builder => $query
+        $query->where(fn (Builder $query): Builder => $query
             ->whereHas('currentCertificate', fn (Builder $relation): Builder => $column($relation, 'valid_until'))
             ->orWhereHas('ecacPowerOfAttorney', fn (Builder $relation): Builder => $column($relation, 'expires_at')));
+    }
+
+    /**
+     * Values inside one column are a union. Callers AND this group with the other columns.
+     *
+     * @param  list<string>  $values
+     * @param  callable(Builder, string): void  $apply
+     */
+    private function whereAnyOf(Builder $query, array $values, callable $apply): Builder
+    {
+        if ($values === []) {
+            return $query;
+        }
+
+        if (count($values) === 1) {
+            $apply($query, $values[0]);
+
+            return $query;
+        }
+
+        return $query->where(function (Builder $query) use ($values, $apply): void {
+            foreach ($values as $index => $value) {
+                $query->{$index === 0 ? 'where' : 'orWhere'}(
+                    function (Builder $query) use ($apply, $value): void {
+                        $apply($query, $value);
+                    }
+                );
+            }
+        });
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringList(mixed $value): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        $items = is_array($value) ? $value : [$value];
+        $strings = [];
+
+        foreach ($items as $item) {
+            if (! is_string($item) || $item === '' || in_array($item, $strings, true)) {
+                continue;
+            }
+
+            $strings[] = $item;
+        }
+
+        return $strings;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function idList(mixed $value): array
+    {
+        if ($value === null || $value === '' || $value === 0) {
+            return [];
+        }
+
+        $items = is_array($value) ? $value : [$value];
+        $ids = [];
+
+        foreach ($items as $item) {
+            if (! is_numeric($item) || (int) $item < 1) {
+                continue;
+            }
+
+            $id = (int) $item;
+
+            if (! in_array($id, $ids, true)) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    public function scopeWithPortfolioView(Builder $query, ?string $view): Builder
+    {
+        if ($view === null || $view === '' || ! preg_match('/^(certificate|poa)_(missing|valid|expiring|expired)$/', $view, $matches)) {
+            return $query;
+        }
+
+        $relation = $matches[1] === 'certificate' ? 'currentCertificate' : 'ecacPowerOfAttorney';
+        $column = $matches[1] === 'certificate' ? 'valid_until' : 'expires_at';
+
+        return $this->applyDocumentStatus($query, $relation, $column, $matches[2]);
+    }
+
+    private function applyDocumentStatus(Builder $query, string $relation, string $column, string $status): Builder
+    {
+        if (DeadlineStatus::tryFrom($status) === null) {
+            return $query;
+        }
+
+        if ($status === DeadlineStatus::Missing->value) {
+            return $query->whereDoesntHave($relation);
+        }
+
+        $today = now()->startOfDay();
+        $limit = $today->copy()->addDays(30)->endOfDay();
+
+        return $query->whereHas($relation, fn (Builder $documents): Builder => match ($status) {
+            DeadlineStatus::Expired->value => $documents->whereDate($column, '<', $today),
+            DeadlineStatus::Expiring->value => $documents->whereBetween($column, [$today, $limit]),
+            DeadlineStatus::Valid->value => $documents->where($column, '>', $limit),
+            default => $documents,
+        });
+    }
+
+    private function orderByDateSubquery(Builder $query, Builder $date, string $direction): Builder
+    {
+        $direction = $direction === 'desc' ? 'desc' : 'asc';
+        $sql = $date->toSql();
+        $bindings = $date->getBindings();
+
+        return $query
+            ->orderByRaw('('.$sql.') is null', $bindings)
+            ->orderByRaw('('.$sql.') '.$direction, $bindings)
+            ->orderBy('name');
     }
 }
