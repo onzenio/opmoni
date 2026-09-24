@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['account_id', 'name', 'client_id', 'template_id', 'reference_month', 'status', 'due_on'])]
+#[Fillable(['name', 'client_id', 'template_id', 'reference_month', 'status', 'due_on'])]
 class Process extends Model
 {
     /** @use HasFactory<Process> */

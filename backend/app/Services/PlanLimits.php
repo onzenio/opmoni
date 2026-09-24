@@ -13,11 +13,14 @@ class PlanLimits
      */
     public static function assertCanCreate(Account $account, string $key): void
     {
-        $limit = $account->subscription->plan->limits[$key] ?? null;
+        $limits = $account->subscription?->plan?->limits ?? [];
+        $limit = $limits[$key] ?? null;
 
         if ($limit === null) {
             return;
         }
+
+        $limit = (int) $limit;
 
         $count = match ($key) {
             'users' => $account->members()->count(),

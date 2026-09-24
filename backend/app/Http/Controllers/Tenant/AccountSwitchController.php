@@ -52,23 +52,23 @@ class AccountSwitchController extends Controller
             && (int) $previousAccountId !== $targetAccountId
             && $user->accountRole((int) $previousAccountId) === null
         ) {
-            SupportAccessLog::create([
+            (new SupportAccessLog)->forceFill([
                 'super_admin_user_id' => $user->getKey(),
                 'account_id' => (int) $previousAccountId,
                 'action' => 'exit',
                 'metadata' => ['via' => 'account.switch', 'restored_account_id' => $targetAccountId],
                 'ip' => $request->ip(),
-            ]);
+            ])->save();
         }
 
         if ($user->accountRole($targetAccountId) === null) {
-            SupportAccessLog::create([
+            (new SupportAccessLog)->forceFill([
                 'super_admin_user_id' => $user->getKey(),
                 'account_id' => $targetAccountId,
                 'action' => 'enter',
                 'metadata' => ['via' => 'account.switch'],
                 'ip' => $request->ip(),
-            ]);
+            ])->save();
         }
     }
 }

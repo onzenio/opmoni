@@ -11,6 +11,7 @@ use App\Models\ProcessTemplate;
 use App\Models\Tag;
 use App\Models\User;
 use App\Services\ProcessGenerationService;
+use App\Tenant\CurrentTenant;
 use Carbon\Carbon;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,6 +32,7 @@ class WorkGenerationTest extends TestCase
         $account = Account::factory()->create();
         $member = $this->memberOf($account, 'admin');
         $this->actingAs($member, 'sanctum');
+        resolve(CurrentTenant::class)->accountId = $account->getKey();
 
         $tag = Tag::factory()->create(['account_id' => $account->getKey()]);
         $template = ProcessTemplate::factory()->create([
@@ -63,6 +65,7 @@ class WorkGenerationTest extends TestCase
         $account = Account::factory()->create();
         $member = $this->memberOf($account, 'admin');
         $this->actingAs($member, 'sanctum');
+        resolve(CurrentTenant::class)->accountId = $account->getKey();
 
         $outsider = $this->memberOf($account, 'operador');
         $insider = $this->memberOf($account, 'operador');

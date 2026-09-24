@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['account_id', 'user_id', 'name', 'q', 'filters'])]
+#[Fillable(['user_id', 'name', 'q', 'filters'])]
 class ClientSavedFilter extends Model
 {
     use BelongsToAccount;

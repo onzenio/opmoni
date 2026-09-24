@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['account_id', 'template_id', 'title', 'department', 'description', 'due_day', 'priority', 'order', 'default_assignee_member_id'])]
+#[Fillable(['template_id', 'title', 'department', 'description', 'due_day', 'priority', 'order', 'default_assignee_member_id'])]
 class ProcessTemplateTask extends Model
 {
     /** @use HasFactory<ProcessTemplateTask> */

@@ -109,9 +109,10 @@ class SubscriptionsTest extends TestCase
     public function test_monitorings_limit_enforced_by_plan_limits_service(): void
     {
         $account = Account::factory()->create();
+        resolve(CurrentTenant::class)->accountId = $account->getKey();
 
         foreach (range(1, 100) as $i) {
-            SerproMonitoring::create(['account_id' => $account->getKey(), 'name' => "Monitoramento {$i}"]);
+            SerproMonitoring::create(['name' => "Monitoramento {$i}"]);
         }
 
         try {

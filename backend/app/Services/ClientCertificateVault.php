@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Client;
 use App\Models\ClientCertificate;
+use App\Tenant\CurrentTenant;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
@@ -64,8 +65,9 @@ class ClientCertificateVault
                     $current->forceFill(['replaced_at' => now(), 'storage_path' => null])->save();
                 }
 
+                resolve(CurrentTenant::class)->accountId ??= $locked->account_id;
+
                 return ClientCertificate::create(array_merge($attributes, [
-                    'account_id' => $locked->account_id,
                     'client_id' => $locked->getKey(),
                 ]));
             });

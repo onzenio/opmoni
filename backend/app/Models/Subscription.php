@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['account_id', 'plan_id', 'status'])]
+#[Fillable(['plan_id', 'status'])]
 class Subscription extends Model
 {
     /** @use HasFactory<Subscription> */

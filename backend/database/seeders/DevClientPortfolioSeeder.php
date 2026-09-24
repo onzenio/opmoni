@@ -13,6 +13,7 @@ use App\Models\Plan;
 use App\Models\Tag;
 use App\Services\BrazilianTaxId;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -63,22 +64,24 @@ class DevClientPortfolioSeeder extends Seeder
         $certPlan = $this->spread($count, self::CERT_SPLIT);
         $poaPlan = $this->spread($count, self::POA_SPLIT);
 
-        $marker = $this->seedTags($tenant);
-        $catalog = Tag::query()->where('account_id', $tenant->getKey())->whereIn('name', array_column(self::CATALOG_TAGS, 'name'))->get();
+        Model::unguarded(function () use ($tenant, $count, $faker, $taxIds, $certPlan, $poaPlan): void {
+            $marker = $this->seedTags($tenant);
+            $catalog = Tag::query()->where('account_id', $tenant->getKey())->whereIn('name', array_column(self::CATALOG_TAGS, 'name'))->get();
 
-        $statuses = [ClientStatus::Active->value, ClientStatus::Active->value, ClientStatus::Active->value,
-            ClientStatus::Active->value, ClientStatus::Active->value, ClientStatus::Active->value,
-            ClientStatus::Inactive->value];
+            $statuses = [ClientStatus::Active->value, ClientStatus::Active->value, ClientStatus::Active->value,
+                ClientStatus::Active->value, ClientStatus::Active->value, ClientStatus::Active->value,
+                ClientStatus::Inactive->value];
 
-        for ($index = 0; $index < $count; $index++) {
-            $personType = $index % 5 === 4 ? ClientPersonType::Individual : ClientPersonType::Company;
+            for ($index = 0; $index < $count; $index++) {
+                $personType = $index % 5 === 4 ? ClientPersonType::Individual : ClientPersonType::Company;
 
-            $client = $this->makeClient($tenant->getKey(), $faker, $taxIds, $personType, $statuses, $index);
+                $client = $this->makeClient($tenant->getKey(), $faker, $taxIds, $personType, $statuses, $index);
 
-            $this->makeCertificate($tenant->getKey(), $client, $certPlan[$index]);
-            $this->makePowerOfAttorney($tenant->getKey(), $client, $poaPlan[$index]);
-            $this->attachTags($tenant->getKey(), $client, $catalog, $marker, $index);
-        }
+                $this->makeCertificate($tenant->getKey(), $client, $certPlan[$index]);
+                $this->makePowerOfAttorney($tenant->getKey(), $client, $poaPlan[$index]);
+                $this->attachTags($tenant->getKey(), $client, $catalog, $marker, $index);
+            }
+        });
 
         $fresh = Client::withoutGlobalScopes()->where('account_id', $tenant->getKey())->count();
         $this->command?->info("Carteira dev: {$fresh} clientes na conta {$tenant->getKey()} ({$tenant->name}).");
@@ -118,7 +121,7 @@ class DevClientPortfolioSeeder extends Seeder
         $plan = Plan::query()->where('slug', 'empresarial')->firstOrFail();
 
         $tenant->subscription()->updateOrCreate(
-            ['account_id' => $tenant->getKey()],
+            [],
             ['plan_id' => $plan->getKey(), 'status' => 'active']
         );
     }
@@ -264,13 +267,13 @@ class DevClientPortfolioSeeder extends Seeder
     {
         foreach (self::CATALOG_TAGS as $tag) {
             Tag::withoutGlobalScopes()->firstOrCreate(
-                ['account_id' => $tenant->getKey(), 'name' => $tag['name']],
+                ['name' => $tag['name'], 'account_id' => $tenant->getKey()],
                 ['color' => $tag['color']]
             );
         }
 
         return Tag::withoutGlobalScopes()->firstOrCreate(
-            ['account_id' => $tenant->getKey(), 'name' => self::MARKER_TAG],
+            ['name' => self::MARKER_TAG, 'account_id' => $tenant->getKey()],
             ['color' => 'neutral']
         );
     }

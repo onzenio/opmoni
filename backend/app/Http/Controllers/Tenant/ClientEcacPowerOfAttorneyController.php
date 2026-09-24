@@ -15,7 +15,7 @@ class ClientEcacPowerOfAttorneyController extends Controller
     {
         $client->ecacPowerOfAttorney()->updateOrCreate(
             ['client_id' => $client->getKey()],
-            array_merge($request->validated(), ['account_id' => $client->account_id])
+            $request->validated()
         );
 
         return new ClientResource($client->fresh(['currentCertificate', 'ecacPowerOfAttorney']));

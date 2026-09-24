@@ -176,7 +176,9 @@ class ClientEcacPowerOfAttorneyTest extends TestCase
                 'account_id' => $account->getKey(), 'client_id' => $client->getKey(),
             ]);
         }
-        $this->actingAs($this->memberOf($account, 'operador'), 'sanctum');
+        $operator = $this->memberOf($account, 'operador');
+        $operator->accountRole($account->getKey());
+        $this->actingAs($operator, 'sanctum');
 
         $countFor = function (int $perPage): int {
             DB::flushQueryLog();

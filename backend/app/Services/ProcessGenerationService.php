@@ -36,7 +36,6 @@ class ProcessGenerationService
             }
 
             $process = Process::query()->create([
-                'account_id' => $template->account_id,
                 'name' => $template->name.' '.$reference->format('m/Y'),
                 'template_id' => $template->getKey(),
                 'client_id' => $client->getKey(),
@@ -47,7 +46,6 @@ class ProcessGenerationService
 
             foreach ($template->steps()->orderBy('order')->get() as $step) {
                 $process->tasks()->create([
-                    'account_id' => $template->account_id,
                     'title' => $step->title,
                     'department' => $step->department,
                     'description' => $step->description,
