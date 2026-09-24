@@ -6,12 +6,14 @@ use App\Models\Account;
 use App\Models\Client;
 use App\Models\Document;
 use App\Models\Process;
+use App\Models\ProcessTemplate;
 use App\Models\SerproMonitoring;
 use App\Observers\AccountObserver;
 use App\Policies\AccountPolicy;
 use App\Policies\ClientPolicy;
 use App\Policies\DocumentPolicy;
 use App\Policies\ProcessPolicy;
+use App\Policies\ProcessTemplatePolicy;
 use App\Policies\SerproMonitoringPolicy;
 use App\Tenant\CurrentTenant;
 use Illuminate\Support\Facades\Gate;
@@ -39,5 +41,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(SerproMonitoring::class, SerproMonitoringPolicy::class);
         Gate::policy(Document::class, DocumentPolicy::class);
         Gate::policy(Process::class, ProcessPolicy::class);
+        Gate::policy(ProcessTemplate::class, ProcessTemplatePolicy::class);
     }
 }

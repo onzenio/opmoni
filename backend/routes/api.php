@@ -20,6 +20,7 @@ use App\Http\Controllers\Tenant\ClientSelectionController;
 use App\Http\Controllers\Tenant\ClientTagAssignmentController;
 use App\Http\Controllers\Tenant\DocumentController;
 use App\Http\Controllers\Tenant\ProcessController;
+use App\Http\Controllers\Tenant\ProcessTemplateController;
 use App\Http\Controllers\Tenant\SerproMonitoringController;
 use App\Http\Controllers\Tenant\TagController;
 use Illuminate\Http\Request;
@@ -59,6 +60,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::apiResource('monitorings', SerproMonitoringController::class);
     Route::apiResource('documents', DocumentController::class);
     Route::apiResource('processes', ProcessController::class);
+    Route::apiResource('process-templates', ProcessTemplateController::class);
+    Route::get('process-templates/{process_template}/preview', [ProcessTemplateController::class, 'preview']);
+    Route::post('process-templates/{process_template}/generate', [ProcessTemplateController::class, 'generate']);
     Route::apiResource('account/members', AccountMemberController::class)->parameter('members', 'member');
 });
 
