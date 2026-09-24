@@ -5,8 +5,8 @@ namespace App\Http\Requests\Tenant;
 use App\Enums\TaskPriority;
 use App\Enums\TaxRegime;
 use App\Models\AccountUser;
-use App\Models\Department;
 use App\Models\ProcessTemplate;
+use App\Services\DepartmentMembership;
 use App\Tenant\CurrentTenant;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -79,8 +79,11 @@ class UpdateProcessTemplateRequest extends FormRequest
 
             foreach ($steps as $index => $step) {
                 $department = is_array($step) ? ($step['department'] ?? null) : null;
+                $departmentId = is_string($department)
+                    ? DepartmentMembership::findId($accountId, $department)
+                    : null;
 
-                if (is_string($department) && trim($department) !== '' && ! $this->departmentExists($department)) {
+                if (is_string($department) && trim($department) !== '' && $departmentId === null) {
                     $validator->errors()->add(
                         "steps.$index.department",
                         'O departamento informado não está cadastrado nesta conta.'
@@ -103,15 +106,17 @@ class UpdateProcessTemplateRequest extends FormRequest
                         "steps.$index.default_assignee_member_id",
                         'Responsável deve ser membro da conta.'
                     );
+
+                    continue;
+                }
+
+                if ($departmentId !== null && ! DepartmentMembership::memberBelongs($accountId, $departmentId, (int) $assignee)) {
+                    $validator->errors()->add(
+                        "steps.$index.default_assignee_member_id",
+                        'O responsável precisa pertencer ao departamento da etapa.'
+                    );
                 }
             }
         });
-    }
-
-    private function departmentExists(string $name): bool
-    {
-        return Department::query()
-            ->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($name))])
-            ->exists();
     }
 }

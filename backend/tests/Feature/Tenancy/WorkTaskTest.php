@@ -220,6 +220,37 @@ class WorkTaskTest extends TestCase
             ->assertJsonCount(1, 'data');
     }
 
+    public function test_task_reassign_rejects_assignee_outside_task_department(): void
+    {
+        $account = Account::factory()->create();
+        $admin = $this->memberOf($account, 'admin');
+        $this->actingAs($admin, 'sanctum');
+
+        $outsider = $this->memberOf($account, 'operador');
+        $insider = $this->memberOf($account, 'operador');
+        $department = Department::factory()->create(['account_id' => $account->getKey(), 'name' => 'Fiscal']);
+        $department->members()->attach($insider->getKey(), ['account_id' => $account->getKey()]);
+
+        $process = Process::factory()->create(['account_id' => $account->getKey()]);
+        $task = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'department' => 'Fiscal',
+        ]);
+
+        $this->patchJson("/api/tasks/{$task->getKey()}", ['assignee_member_id' => $outsider->getKey()])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'assignee_member_id' => 'O responsável precisa pertencer ao departamento da tarefa.',
+            ]);
+
+        $this->patchJson("/api/tasks/{$task->getKey()}", ['assignee_member_id' => $insider->getKey()])
+            ->assertOk()
+            ->assertJsonPath('data.assignee_member_id', $insider->getKey());
+
+        $this->patchJson("/api/tasks/{$task->getKey()}", ['assignee_member_id' => null])->assertOk();
+    }
+
     private function memberOf(Account $account, string $role): User
     {
         $user = User::factory()->create();

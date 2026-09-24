@@ -176,6 +176,48 @@ class WorkTemplateTest extends TestCase
         $this->assertDatabaseCount('process_template_tasks', 0);
     }
 
+    public function test_template_rejects_assignee_outside_step_department(): void
+    {
+        $account = Account::factory()->create();
+        $operador = $this->memberOf($account, 'operador');
+        $this->actingAs($operador, 'sanctum');
+
+        $outsider = $this->memberOf($account, 'user');
+        $insider = $this->memberOf($account, 'user');
+        $department = Department::factory()->create(['account_id' => $account->getKey(), 'name' => 'Fiscal']);
+        $department->members()->attach($insider->getKey(), ['account_id' => $account->getKey()]);
+
+        $this->postJson('/api/process-templates', [
+            'name' => 'PGDAS',
+            'steps' => [
+                ['title' => 'Apurar', 'department' => 'Fiscal', 'due_day' => 3, 'priority' => 'medium', 'order' => 1, 'default_assignee_member_id' => $outsider->getKey()],
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'steps.0.default_assignee_member_id' => 'O responsável precisa pertencer ao departamento da etapa.',
+            ]);
+
+        $this->assertDatabaseCount('process_templates', 0);
+    }
+
+    public function test_template_accepts_assignee_inside_step_department(): void
+    {
+        $account = Account::factory()->create();
+        $operador = $this->memberOf($account, 'operador');
+        $this->actingAs($operador, 'sanctum');
+
+        $insider = $this->memberOf($account, 'user');
+        $department = Department::factory()->create(['account_id' => $account->getKey(), 'name' => 'Fiscal']);
+        $department->members()->attach($insider->getKey(), ['account_id' => $account->getKey()]);
+
+        $this->postJson('/api/process-templates', [
+            'name' => 'PGDAS',
+            'steps' => [
+                ['title' => 'Apurar', 'department' => 'fiscal', 'due_day' => 3, 'priority' => 'medium', 'order' => 1, 'default_assignee_member_id' => $insider->getKey()],
+            ],
+        ])->assertCreated();
+    }
+
     private function memberOf(Account $account, string $role): User
     {
         $user = User::factory()->create();

@@ -5,6 +5,7 @@ namespace App\Http\Requests\Tenant;
 use App\Enums\TaskStatus;
 use App\Models\AccountUser;
 use App\Models\Task;
+use App\Services\DepartmentMembership;
 use App\Tenant\CurrentTenant;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -59,6 +60,22 @@ class UpdateTaskRequest extends FormRequest
 
             if (! $belongs) {
                 $validator->errors()->add('assignee_member_id', 'Responsável deve ser membro da conta.');
+
+                return;
+            }
+
+            $task = $this->route('task');
+
+            if (! $task instanceof Task) {
+                return;
+            }
+
+            $departmentId = DepartmentMembership::findId($accountId, $task->department);
+
+            // Departamento pode ter sido excluído depois da geração (snapshot
+            // congelado): sem cadastro, não há vínculo a verificar.
+            if ($departmentId !== null && ! DepartmentMembership::memberBelongs($accountId, $departmentId, (int) $assignee)) {
+                $validator->errors()->add('assignee_member_id', 'O responsável precisa pertencer ao departamento da tarefa.');
             }
         });
     }
