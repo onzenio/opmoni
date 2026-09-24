@@ -294,7 +294,7 @@ watch(error, (value) => {
 
 watch(membersError, (value) => {
   if (value && canManageClients.value) toast.add(membersWarning())
-})
+}, { immediate: true })
 
 watch(canManageClients, (value) => {
   if (value) void refreshMembersData()
