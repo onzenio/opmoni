@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DateValue } from '@internationalized/date'
 import { CalendarDate, getLocalTimeZone, today } from '@internationalized/date'
+import { statusPresentation } from '~/composables/useWorkPresentation'
 import type { WorkTask } from '~/types/work'
 
 definePageMeta({ middleware: 'auth' })
@@ -45,15 +46,6 @@ const byDay = computed(() => {
   }
   return map
 })
-
-function statusPresentation(taskStatus: WorkTask['status']): { label: string, color: 'info' | 'warning' | 'success' | 'neutral' } {
-  switch (taskStatus) {
-    case 'todo': return { label: 'A fazer', color: 'info' }
-    case 'doing': return { label: 'Em progresso', color: 'warning' }
-    case 'done': return { label: 'Concluída', color: 'success' }
-    case 'dismissed': return { label: 'Dispensada', color: 'neutral' }
-  }
-}
 
 function toKey(date: { year: number, month: number, day: number }): string {
   return `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`

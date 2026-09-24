@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AccordionItem } from '@nuxt/ui'
-import type { WorkProcess, WorkTask } from '~/types/work'
+import type { WorkProcessDetail, WorkTask } from '~/types/work'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -8,9 +8,13 @@ const route = useRoute()
 const toast = useToast()
 const { showProcess } = useWork()
 
-const processId = computed(() => Number(route.params.id))
+const processId = computed(() => {
+  const id = Number(route.params.id)
+  if (Number.isNaN(id)) throw createError({ statusCode: 404, message: 'Não encontrado' })
+  return id
+})
 
-const { data, status, error, refresh } = await useAsyncData<WorkProcess & { tasks?: WorkTask[] }>(
+const { data, status, error, refresh } = await useAsyncData<WorkProcessDetail>(
   'work-processo-detalhe',
   () => showProcess(processId.value),
   { watch: [processId] }
@@ -20,8 +24,7 @@ const process = computed(() => data.value ?? null)
 const isLoading = computed(() => status.value === 'pending')
 
 const tasks = computed<WorkTask[]>(() => {
-  const raw = data.value as (WorkProcess & { tasks?: WorkTask[] }) | null
-  return [...(raw?.tasks ?? [])].sort((a, b) => {
+  return [...(data.value?.tasks ?? [])].sort((a, b) => {
     if (!a.due_on && !b.due_on) return a.order - b.order
     if (!a.due_on) return 1
     if (!b.due_on) return -1

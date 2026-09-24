@@ -16,18 +16,10 @@ import type {
   CnpjRefreshPreview,
   PowerOfAttorneyPayload
 } from '~/types/client'
+import { queryOf } from './useApiQuery'
 
 export function useClients() {
   const { $api } = useNuxtApp()
-
-  function queryOf(params: object) {
-    return Object.fromEntries(
-      Object.entries(params).flatMap(([key, value]) => {
-        if (value === undefined) return []
-        return [[Array.isArray(value) ? `${key}[]` : key, value]]
-      })
-    )
-  }
 
   async function list(params: ClientListParams) {
     return $api<{

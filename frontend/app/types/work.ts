@@ -27,4 +27,5 @@ export interface WorkTemplatePayload {
   steps?: { id?: number, title: string, department: string, description?: string | null, due_day: number, priority: WorkTaskPriority, order: number, default_assignee_member_id?: number | null }[]
 }
 export interface WorkTask { id: number, title: string, department: string, description: string | null, status: WorkTaskStatus, due_on: string | null, priority: WorkTaskPriority, assignee_member_id: number | null, order: number, process?: { id: number, name: string, client?: { id: number, name: string } } }
+export interface WorkProcessDetail extends WorkProcess { tasks: WorkTask[] }
 export interface WorkGroupedClient { client: { id: number, name: string }, totals: { processes: number, tasks: number }, processes: { process: { id: number, name: string }, ratio: number, tasks: WorkTask[] }[] }

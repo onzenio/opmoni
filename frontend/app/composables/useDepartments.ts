@@ -4,18 +4,10 @@ import type {
   DepartmentUpdatePayload,
   DepartmentWritePayload
 } from '~/types/team'
+import { queryOf } from './useApiQuery'
 
 export function useDepartments() {
   const { $api } = useNuxtApp()
-
-  function queryOf(params: object) {
-    return Object.fromEntries(
-      Object.entries(params).flatMap(([key, value]) => {
-        if (value === undefined || value === null) return []
-        return [[Array.isArray(value) ? `${key}[]` : key, value]]
-      })
-    )
-  }
 
   async function list(params: Record<string, unknown> = {}) {
     const response = await $api<{ data: Department[] }>('/departments', {

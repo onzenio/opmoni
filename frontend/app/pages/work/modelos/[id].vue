@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TabsItem } from '@nuxt/ui'
+import { apiMessage } from '~/composables/useApiError'
 import type { ClientTag, TaxRegime } from '~/types/client'
 import type { WorkPreviewRow, WorkTaskPriority, WorkTemplate, WorkTemplatePayload } from '~/types/work'
 import { taxRegimeLabel } from '~/utils/portfolioLabels'
@@ -11,7 +12,7 @@ const router = useRouter()
 const toast = useToast()
 const { canManageClients } = useAuth()
 const { $api } = useNuxtApp()
-const { listTemplates, showTemplate, createTemplate, updateTemplate, previewTemplate, generateTemplate } = useWork()
+const { showTemplate, createTemplate, updateTemplate, previewTemplate, generateTemplate } = useWork()
 
 function parseId(param: unknown): number | null {
   const raw = Array.isArray(param) ? param[0] : param
@@ -102,13 +103,7 @@ async function load() {
   loading.value = true
   loadError.value = false
   try {
-    if (!canManageClients.value) {
-      const found = (await listTemplates()).find(template => template.id === templateId.value)
-      if (found) syncFromTemplate(found)
-      else throw new Error('not-found')
-    } else {
-      syncFromTemplate(await showTemplate(templateId.value as number))
-    }
+    syncFromTemplate(await showTemplate(templateId.value as number))
   } catch {
     loadError.value = true
     toast.add({ title: 'Não foi possível carregar o modelo', color: 'error' })
@@ -130,16 +125,7 @@ const { data: tagCatalog } = await useAsyncData<ClientTag[]>(
   { default: () => [] as ClientTag[] }
 )
 
-const { data: members } = await useAsyncData(
-  'work-model-members',
-  async () => {
-    const res = await $api<{ data?: { id: number, name: string }[] } | { id: number, name: string }[]>('/account/members/directory')
-    return Array.isArray(res) ? res : (res.data ?? [])
-  },
-  { default: () => [] as { id: number, name: string }[] }
-)
-
-const memberOptions = computed(() => (members.value ?? []).map(member => ({ label: member.name, value: member.id })))
+const { memberOptions } = useDirectory()
 
 const previewKey = computed(() => (isNew.value ? 'new' : String(templateId.value)))
 const previewEnabled = computed(() => !isNew.value)
@@ -226,14 +212,6 @@ const removedClientId = ref('')
 
 function removeException(clientId: number) {
   form.exceptions = form.exceptions.filter(exception => exception.client_id !== clientId)
-}
-
-function apiMessage(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') return undefined
-  const data = (error as { data?: { message?: string } }).data
-  const nested = (error as { response?: { _data?: { message?: string } } }).response?._data
-  const message = data?.message ?? nested?.message
-  return typeof message === 'string' && message.length > 0 ? message : undefined
 }
 
 function buildPayload(): WorkTemplatePayload {

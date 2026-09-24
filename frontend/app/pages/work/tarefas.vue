@@ -1,19 +1,17 @@
 <script setup lang="ts">
+import { watchDebounced } from '@vueuse/core'
+import { apiMessage, apiStatus } from '~/composables/useApiError'
+import { priorityPresentation, statusPresentation } from '~/composables/useWorkPresentation'
 import type { WorkTask } from '~/types/work'
 
 definePageMeta({ middleware: 'auth' })
 
 const toast = useToast()
-const { $api } = useNuxtApp()
 const { listTasks, updateTask } = useWork()
 const { canManageClients } = useAuth()
+const { list: listDepartments } = useDepartments()
 
 type ColumnKey = WorkTask['status']
-
-interface MemberOption {
-  label: string
-  value: number
-}
 
 interface TaskFilters {
   processId: string
@@ -47,28 +45,31 @@ const filterQuery = computed(() => ({
   due_to: filters.dueTo || undefined
 }))
 
-const filterKey = computed(() => JSON.stringify(filterQuery.value))
-
 const { data, status, error, refresh } = await useAsyncData<WorkTask[]>(
   'work-tarefas',
-  () => listTasks(filterQuery.value),
-  { watch: [filterKey] }
+  () => listTasks(filterQuery.value)
 )
+
+watchDebounced(filters, () => void refresh(), { debounce: 300 })
 
 const tasks = computed<WorkTask[]>(() => data.value ?? [])
 const isLoading = computed(() => status.value === 'pending')
 
-const { data: members, error: membersError } = await useAsyncData(
-  'work-members',
-  async () => {
-    const res = await $api<{ data?: { id: number, name: string }[] } | { id: number, name: string }[]>('/account/members/directory')
-    return Array.isArray(res) ? res : (res.data ?? [])
-  },
-  { default: () => [] as { id: number, name: string }[] }
-)
+const { error: membersError, memberOptions, memberName } = useDirectory()
 
 const membersFailed = computed(() => membersError.value !== null && membersError.value !== undefined)
 const membersForbidden = computed(() => apiStatus(membersError.value) === 403)
+
+const { data: departments } = await useAsyncData(
+  'work-departments',
+  () => listDepartments(),
+  { default: () => [] }
+)
+
+const departmentOptions = computed(() => [
+  { label: 'Todos', value: '' },
+  ...(departments.value ?? []).map(department => ({ label: department.name, value: department.name }))
+])
 
 const membersHint = computed(() => {
   if (!membersFailed.value) return undefined
@@ -85,10 +86,6 @@ function membersWarning(): { title: string, description: string, color: 'warning
   }
 }
 
-const memberOptions = computed<MemberOption[]>(() =>
-  (members.value ?? []).map(member => ({ label: member.name, value: member.id }))
-)
-
 const assigneeItems = computed(() => [
   { label: 'Sem responsável', value: null },
   ...memberOptions.value
@@ -98,11 +95,6 @@ const assigneeFilterItems = computed(() => [
   { label: 'Todos', value: '' },
   ...memberOptions.value.map(option => ({ label: option.label, value: String(option.value) }))
 ])
-
-function memberName(memberId: number | null): string {
-  if (memberId === null) return 'Sem responsável'
-  return memberOptions.value.find(option => option.value === memberId)?.label ?? `Membro ${String(memberId)}`
-}
 
 const columns = [
   { key: 'todo' as ColumnKey, title: 'A fazer', icon: 'i-lucide-circle' },
@@ -116,24 +108,6 @@ const tasksByColumn = computed<Record<ColumnKey, WorkTask[]>>(() => {
   for (const task of tasks.value) board[task.status].push(task)
   return board
 })
-
-function statusPresentation(taskStatus: WorkTask['status']): { label: string, color: 'info' | 'warning' | 'success' | 'neutral' } {
-  switch (taskStatus) {
-    case 'todo': return { label: 'A fazer', color: 'info' }
-    case 'doing': return { label: 'Em progresso', color: 'warning' }
-    case 'done': return { label: 'Concluída', color: 'success' }
-    case 'dismissed': return { label: 'Dispensada', color: 'neutral' }
-  }
-}
-
-function priorityPresentation(priority: WorkTask['priority']): { label: string, color: 'neutral' | 'info' | 'warning' | 'error' } {
-  switch (priority) {
-    case 'low': return { label: 'Baixa', color: 'neutral' }
-    case 'medium': return { label: 'Média', color: 'info' }
-    case 'high': return { label: 'Alta', color: 'warning' }
-    case 'urgent': return { label: 'Urgente', color: 'error' }
-  }
-}
 
 function formatDueOn(value: string | null): string {
   if (!value) return 'Sem vencimento'
@@ -154,26 +128,6 @@ function clearLocked(taskId: number) {
   const next = new Set(lockedIds.value)
   next.delete(taskId)
   lockedIds.value = next
-}
-
-function apiMessage(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') return undefined
-  const data = (error as { data?: { message?: string }, response?: { _data?: { message?: string } } }).data
-  const nested = (error as { response?: { _data?: { message?: string } } }).response?._data
-  const message = data?.message ?? nested?.message
-  return typeof message === 'string' && message.length > 0 ? message : undefined
-}
-
-function apiStatus(error: unknown): number | undefined {
-  if (!error || typeof error !== 'object') return undefined
-  const record = error as {
-    status?: number
-    statusCode?: number
-    response?: { status?: number, _data?: { message?: string } }
-    data?: { status?: number, message?: string }
-  }
-  const status = record.status ?? record.statusCode ?? record.response?.status ?? record.data?.status
-  return typeof status === 'number' ? status : undefined
 }
 
 const busyId = ref<number | null>(null)
@@ -361,7 +315,14 @@ watch(dismissOpen, (open) => {
           />
         </UFormField>
         <UFormField label="Departamento" name="department">
-          <UInput v-model="filters.department" placeholder="Ex.: Fiscal" class="w-full" />
+          <USelectMenu
+            v-model="filters.department"
+            :items="departmentOptions"
+            value-key="value"
+            label-key="label"
+            placeholder="Todos"
+            class="w-full"
+          />
         </UFormField>
         <UFormField label="Prioridade" name="priority">
           <USelect
