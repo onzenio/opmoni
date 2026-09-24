@@ -4,6 +4,7 @@ namespace Tests\Feature\Tenancy;
 
 use App\Models\Account;
 use App\Models\AccountUser;
+use App\Models\Department;
 use App\Models\User;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,6 +48,51 @@ class MemberDirectoryTest extends TestCase
         $response->assertJsonPath('data.0.name', 'Ana');
         $response->assertJsonMissing(['email' => 'ana@opmoni.dev']);
         $response->assertJsonMissing(['email' => 'beto@opmoni.dev']);
+    }
+
+    public function test_directory_returns_linked_departments_scoped_to_account(): void
+    {
+        $account = Account::factory()->create();
+        $other = Account::factory()->create();
+        $ana = $this->memberOf($account, 'user', ['name' => 'Ana']);
+        $beto = $this->memberOf($account, 'operador', ['name' => 'Beto']);
+
+        AccountUser::create(['account_id' => $other->getKey(), 'user_id' => $ana->getKey(), 'role' => 'admin']);
+
+        $fiscal = Department::factory()->create(['account_id' => $account->getKey(), 'name' => 'Fiscal', 'color' => 'success']);
+        $pessoal = Department::factory()->create(['account_id' => $account->getKey(), 'name' => 'Pessoal', 'color' => 'primary']);
+        $fiscal->members()->attach($ana->getKey(), ['account_id' => $account->getKey()]);
+        $pessoal->members()->attach($ana->getKey(), ['account_id' => $account->getKey()]);
+
+        $foreign = Department::factory()->create(['account_id' => $other->getKey(), 'name' => 'Estrangeiro', 'color' => 'warning']);
+        $foreign->members()->attach($ana->getKey(), ['account_id' => $other->getKey()]);
+
+        $response = $this->actingAs($beto, 'sanctum')->getJson('/api/account/members/directory');
+
+        $response->assertOk();
+        $response->assertJsonCount(2, 'data');
+        $response->assertJsonCount(2, 'data.0.departments');
+        $response->assertJsonCount(0, 'data.1.departments');
+        $response->assertJson([
+            'data' => [
+                [
+                    'id' => $ana->getKey(),
+                    'name' => 'Ana',
+                    'role' => 'user',
+                    'departments' => [
+                        ['id' => $fiscal->getKey(), 'name' => 'Fiscal', 'color' => 'success'],
+                        ['id' => $pessoal->getKey(), 'name' => 'Pessoal', 'color' => 'primary'],
+                    ],
+                ],
+                [
+                    'id' => $beto->getKey(),
+                    'name' => 'Beto',
+                    'role' => 'operador',
+                    'departments' => [],
+                ],
+            ],
+        ]);
+        $response->assertJsonMissing(['name' => 'Estrangeiro']);
     }
 
     public function test_directory_never_leaks_other_account(): void
