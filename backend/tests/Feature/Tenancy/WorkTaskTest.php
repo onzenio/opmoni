@@ -5,6 +5,7 @@ namespace Tests\Feature\Tenancy;
 use App\Models\Account;
 use App\Models\AccountUser;
 use App\Models\Client;
+use App\Models\Department;
 use App\Models\Process;
 use App\Models\ProcessTemplate;
 use App\Models\Task;
@@ -180,6 +181,43 @@ class WorkTaskTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status', 'doing')
             ->assertJsonPath('data.assignee_member_id', $assignee->getKey());
+    }
+
+    public function test_task_department_filter_rejects_unknown_department(): void
+    {
+        $account = Account::factory()->create();
+        $member = $this->memberOf($account, 'admin');
+        $this->actingAs($member, 'sanctum');
+
+        $this->getJson('/api/tasks?department=Inexistente')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'department' => 'O departamento informado não está cadastrado nesta conta.',
+            ]);
+
+        $this->getJson('/api/work/calendar?from=2026-03-01&to=2026-03-31&department=Inexistente')
+            ->assertUnprocessable();
+    }
+
+    public function test_task_department_filter_accepts_registered_department(): void
+    {
+        $account = Account::factory()->create();
+        $member = $this->memberOf($account, 'admin');
+        $this->actingAs($member, 'sanctum');
+
+        Department::factory()->create(['account_id' => $account->getKey(), 'name' => 'Fiscal']);
+
+        $process = Process::factory()->create(['account_id' => $account->getKey()]);
+        Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'title' => 'Etapa fiscal',
+            'department' => 'Fiscal',
+        ]);
+
+        $this->getJson('/api/tasks?department=fISCAL')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
     }
 
     private function memberOf(Account $account, string $role): User

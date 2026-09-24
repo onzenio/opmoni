@@ -5,6 +5,7 @@ namespace App\Http\Requests\Tenant;
 use App\Enums\TaskPriority;
 use App\Enums\TaxRegime;
 use App\Models\AccountUser;
+use App\Models\Department;
 use App\Models\ProcessTemplate;
 use App\Tenant\CurrentTenant;
 use Illuminate\Foundation\Http\FormRequest;
@@ -77,6 +78,15 @@ class UpdateProcessTemplateRequest extends FormRequest
             $accountId = resolve(CurrentTenant::class)->accountId;
 
             foreach ($steps as $index => $step) {
+                $department = is_array($step) ? ($step['department'] ?? null) : null;
+
+                if (is_string($department) && trim($department) !== '' && ! $this->departmentExists($department)) {
+                    $validator->errors()->add(
+                        "steps.$index.department",
+                        'O departamento informado não está cadastrado nesta conta.'
+                    );
+                }
+
                 $assignee = is_array($step) ? ($step['default_assignee_member_id'] ?? null) : null;
 
                 if ($assignee === null) {
@@ -96,5 +106,12 @@ class UpdateProcessTemplateRequest extends FormRequest
                 }
             }
         });
+    }
+
+    private function departmentExists(string $name): bool
+    {
+        return Department::query()
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($name))])
+            ->exists();
     }
 }
