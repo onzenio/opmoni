@@ -3,21 +3,23 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\AccountResource;
 use App\Models\Account;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
 
 class AccountController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(): AnonymousResourceCollection
     {
         $accounts = Account::with('subscription.plan')
             ->withCount('members')
             ->orderByDesc('id')
             ->paginate(15);
 
-        return response()->json($accounts);
+        return AccountResource::collection($accounts);
     }
 
     public function store(Request $request): JsonResponse
@@ -34,20 +36,20 @@ class AccountController extends Controller
         $account->load('subscription.plan');
         $account->loadCount('members');
 
-        return response()->json($account, 201);
+        return (new AccountResource($account))->response()->setStatusCode(201);
     }
 
-    public function show(Account $account): JsonResponse
+    public function show(Account $account): AccountResource
     {
         Gate::authorize('view', $account);
 
         $account->load('subscription.plan');
         $account->loadCount('members');
 
-        return response()->json($account);
+        return new AccountResource($account);
     }
 
-    public function update(Request $request, Account $account): JsonResponse
+    public function update(Request $request, Account $account): AccountResource
     {
         Gate::authorize('update', $account);
 
@@ -61,6 +63,6 @@ class AccountController extends Controller
         $account->load('subscription.plan');
         $account->loadCount('members');
 
-        return response()->json($account);
+        return new AccountResource($account);
     }
 }

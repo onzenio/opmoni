@@ -4,10 +4,12 @@ namespace App\Policies;
 
 use App\Models\Client;
 use App\Models\User;
-use App\Tenant\CurrentTenant;
+use App\Policies\Concerns\HasTenantRole;
 
 class ClientPolicy
 {
+    use HasTenantRole;
+
     public function viewAny(User $user): bool
     {
         return $this->tenantRole($user) !== null;
@@ -43,25 +45,5 @@ class ClientPolicy
     public function categorize(User $user): bool
     {
         return in_array($this->tenantRole($user), ['admin', 'operador'], true);
-    }
-
-    private function isTenantModel(int $accountId): bool
-    {
-        return resolve(CurrentTenant::class)->accountId === $accountId;
-    }
-
-    private function tenantRole(User $user): ?string
-    {
-        $tenantId = resolve(CurrentTenant::class)->accountId;
-
-        if ($tenantId === null) {
-            return null;
-        }
-
-        if ($user->isSuperAdmin()) {
-            return 'admin';
-        }
-
-        return $user->accountRole($tenantId);
     }
 }

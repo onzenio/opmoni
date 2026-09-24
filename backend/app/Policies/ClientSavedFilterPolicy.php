@@ -4,10 +4,13 @@ namespace App\Policies;
 
 use App\Models\ClientSavedFilter;
 use App\Models\User;
+use App\Policies\Concerns\HasTenantRole;
 use App\Tenant\CurrentTenant;
 
 class ClientSavedFilterPolicy
 {
+    use HasTenantRole;
+
     public function viewAny(User $user): bool
     {
         return $this->tenantRole($user) !== null;
@@ -23,20 +26,5 @@ class ClientSavedFilterPolicy
         return $this->tenantRole($user) !== null
             && $filter->user_id === $user->getKey()
             && resolve(CurrentTenant::class)->accountId === $filter->account_id;
-    }
-
-    private function tenantRole(User $user): ?string
-    {
-        $tenantId = resolve(CurrentTenant::class)->accountId;
-
-        if ($tenantId === null) {
-            return null;
-        }
-
-        if ($user->isSuperAdmin()) {
-            return 'admin';
-        }
-
-        return $user->accountRole($tenantId);
     }
 }

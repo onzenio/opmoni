@@ -3,43 +3,44 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\StoreNameRequest;
+use App\Http\Resources\DocumentResource;
 use App\Models\Document;
 use App\Services\SupportAudit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 class DocumentController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(): AnonymousResourceCollection
     {
         Gate::authorize('viewAny', Document::class);
 
-        return response()->json(Document::all());
+        return DocumentResource::collection(Document::query()->orderBy('name')->paginate(25));
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreNameRequest $request): JsonResponse
     {
         Gate::authorize('create', Document::class);
 
-        $data = $request->validate(['name' => ['required', 'string', 'max:255']]);
-
-        $document = Document::create($data);
+        $document = Document::query()->create($request->validated());
 
         SupportAudit::logWrite($request, 'documents', 'create', $document->getKey(), ['name' => $document->name]);
 
-        return response()->json($document, 201);
+        return (new DocumentResource($document))->response()->setStatusCode(201);
     }
 
-    public function show(Document $document): JsonResponse
+    public function show(Document $document): DocumentResource
     {
         Gate::authorize('view', $document);
 
-        return response()->json($document);
+        return new DocumentResource($document);
     }
 
-    public function update(Request $request, Document $document): JsonResponse
+    public function update(Request $request, Document $document): DocumentResource
     {
         Gate::authorize('update', $document);
 
@@ -49,7 +50,7 @@ class DocumentController extends Controller
 
         SupportAudit::logWrite($request, 'documents', 'update', $document->getKey(), ['name' => $document->name]);
 
-        return response()->json($document);
+        return new DocumentResource($document);
     }
 
     public function destroy(Request $request, Document $document): Response

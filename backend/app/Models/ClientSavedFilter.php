@@ -30,9 +30,18 @@ class ClientSavedFilter extends Model
         });
     }
 
+    /**
+     * Resolve the acting user for the `owner` scope without touching the
+     * request helper, so jobs and console commands filter `user_id`
+     * explicitly instead of inheriting a stale HTTP user.
+     */
     private static function actingUserId(): ?int
     {
-        $user = request()->user('sanctum') ?? request()->user();
+        $user = auth('sanctum')->user() ?? auth()->user();
+
+        if ($user === null && app()->runningInConsole()) {
+            return null;
+        }
 
         return $user?->getKey();
     }
