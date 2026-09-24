@@ -56,7 +56,9 @@ const timelineItems = computed(() => tasks.value.map(task => ({
   date: task.due_on ? new Date(`${task.due_on}T00:00:00`).toLocaleDateString('pt-BR') : undefined
 })))
 
-const accordionItems = computed<AccordionItem[]>(() => tasks.value.map((task, index) => ({
+type TaskAccordionItem = AccordionItem & { task: WorkTask, locked: boolean }
+
+const accordionItems = computed<TaskAccordionItem[]>(() => tasks.value.map((task, index) => ({
   label: task.title,
   value: String(task.id),
   disabled: false,
@@ -178,15 +180,15 @@ watch(error, (value) => {
               <div class="flex min-w-0 flex-col gap-2 px-1 pb-1">
                 <div class="flex flex-wrap items-center gap-2">
                   <UBadge
-                    :color="statusPresentation((item as unknown as { task: WorkTask }).task.status).color"
+                    :color="statusPresentation(item.task.status).color"
                     variant="subtle"
-                    :label="statusPresentation((item as unknown as { task: WorkTask }).task.status).label"
+                    :label="statusPresentation(item.task.status).label"
                   />
                   <UBadge
-                    v-if="(item as unknown as { locked: boolean }).locked"
+                    v-if="item.locked"
                     color="warning"
                     variant="subtle"
-                    label="Bloqueada pela cascata"
+                    label="Aguardando etapas anteriores"
                   >
                     <template #leading>
                       <UIcon name="i-lucide-lock" class="size-3" />
@@ -194,20 +196,20 @@ watch(error, (value) => {
                   </UBadge>
                 </div>
                 <UTooltip
-                  v-if="(item as unknown as { locked: boolean }).locked"
-                  text="Etapa anterior pendente bloqueia o avanço (cascata)"
+                  v-if="item.locked"
+                  text="Etapas anteriores pendentes — o avanço pode ser bloqueado se a cascata do modelo estiver ativa"
                 >
                   <p class="flex items-center gap-1.5 text-xs text-muted">
                     <UIcon name="i-lucide-lock" class="size-3.5 shrink-0" />
                     Aguardando conclusão das etapas anteriores.
                   </p>
                 </UTooltip>
-                <p v-if="(item as unknown as { task: WorkTask }).task.description" class="text-sm text-muted">
-                  {{ (item as unknown as { task: WorkTask }).task.description }}
+                <p v-if="item.task.description" class="text-sm text-muted">
+                  {{ item.task.description }}
                 </p>
                 <p class="text-xs text-muted">
-                  Vencimento: {{ (item as unknown as { task: WorkTask }).task.due_on ? new Date(`${(item as unknown as { task: WorkTask }).task.due_on}T00:00:00`).toLocaleDateString('pt-BR') : 'sem prazo' }}
-                  · Ordem {{ (item as unknown as { task: WorkTask }).task.order }}
+                  Vencimento: {{ item.task.due_on ? new Date(`${item.task.due_on}T00:00:00`).toLocaleDateString('pt-BR') : 'sem prazo' }}
+                  · Ordem {{ item.task.order }}
                 </p>
               </div>
             </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { getGroupedRowModel } from '@tanstack/table-core'
+import type { ExpandedState } from '@tanstack/table-core'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { WorkGroupedClient, WorkTask } from '~/types/work'
 
@@ -63,6 +64,22 @@ const flatTasks = computed<FlatRow[]>(() => {
   return rows
 })
 
+const nameByClientId = computed(() => {
+  const map = new Map<number, string>()
+  for (const row of flatTasks.value) {
+    if (!map.has(row.client_id)) map.set(row.client_id, row.client_name)
+  }
+  return map
+})
+
+const nameByProcessId = computed(() => {
+  const map = new Map<number, string>()
+  for (const row of flatTasks.value) {
+    if (!map.has(row.process_id)) map.set(row.process_id, row.process_name)
+  }
+  return map
+})
+
 function statusPresentation(taskStatus: WorkTask['status']): { label: string, color: 'info' | 'warning' | 'success' | 'neutral' } {
   switch (taskStatus) {
     case 'todo': return { label: 'A fazer', color: 'info' }
@@ -73,7 +90,7 @@ function statusPresentation(taskStatus: WorkTask['status']): { label: string, co
 }
 
 const grouping = ref<string[]>(['client_id', 'process_id'])
-const expanded = ref<true>(true)
+const expanded = ref<ExpandedState>(true)
 
 const columns: TableColumn<FlatRow>[] = [
   { accessorKey: 'client_id', header: 'Cliente', enableGrouping: true },
@@ -89,13 +106,12 @@ const columns: TableColumn<FlatRow>[] = [
 
 function groupedTitle(row: TableRow<FlatRow>): string {
   const columnId = row.groupingColumnId ?? ''
-  if (columnId === 'client_id') {
+  if (columnId === 'client_id' || columnId === 'process_id') {
     const id = row.groupingValue as number
-    return flatTasks.value.find(candidate => candidate.client_id === id)?.client_name ?? `Cliente ${String(id)}`
-  }
-  if (columnId === 'process_id') {
-    const id = row.groupingValue as number
-    return flatTasks.value.find(candidate => candidate.process_id === id)?.process_name ?? `Processo ${String(id)}`
+    if (columnId === 'client_id') {
+      return nameByClientId.value.get(id) ?? `Cliente ${String(id)}`
+    }
+    return nameByProcessId.value.get(id) ?? `Processo ${String(id)}`
   }
   return ''
 }

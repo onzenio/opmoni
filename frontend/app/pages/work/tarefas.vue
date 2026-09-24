@@ -266,10 +266,6 @@ async function assign(task: WorkTask, memberId: number | null) {
   }
 }
 
-function assigneeModel(task: WorkTask): number | null {
-  return task.assignee_member_id
-}
-
 function filteredBy(status: ColumnKey): WorkTask[] {
   return tasksByColumn.value[status]
 }
@@ -538,7 +534,7 @@ watch(dismissOpen, (open) => {
 
           <USelectMenu
             v-if="canManageClients"
-            :model-value="assigneeModel(task)"
+            :model-value="task.assignee_member_id"
             :items="assigneeItems"
             value-key="value"
             label-key="label"
