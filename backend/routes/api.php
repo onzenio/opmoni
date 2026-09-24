@@ -18,6 +18,7 @@ use App\Http\Controllers\Tenant\ClientEcacPowerOfAttorneyController;
 use App\Http\Controllers\Tenant\ClientSavedFilterController;
 use App\Http\Controllers\Tenant\ClientSelectionController;
 use App\Http\Controllers\Tenant\ClientTagAssignmentController;
+use App\Http\Controllers\Tenant\DepartmentController;
 use App\Http\Controllers\Tenant\DocumentController;
 use App\Http\Controllers\Tenant\ProcessController;
 use App\Http\Controllers\Tenant\SerproMonitoringController;
@@ -41,6 +42,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('clients/analytics', [ClientController::class, 'analytics']);
     Route::post('clients/tags', [ClientTagAssignmentController::class, 'store']);
     Route::apiResource('tags', TagController::class)->except(['show']);
+    Route::apiResource('departments', DepartmentController::class)->except(['show']);
     Route::get('clients/saved-filters', [ClientSavedFilterController::class, 'index']);
     Route::post('clients/saved-filters', [ClientSavedFilterController::class, 'store']);
     Route::delete('clients/saved-filters/{savedFilter}', [ClientSavedFilterController::class, 'destroy']);

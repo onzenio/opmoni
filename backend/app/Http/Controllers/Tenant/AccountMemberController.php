@@ -61,12 +61,17 @@ class AccountMemberController extends Controller
         $account = $this->tenantAccount();
         Gate::authorize('viewMembers', $account);
 
-        $rows = $account->members()->orderBy('name')->get()->map(fn (User $member): array => [
-            'id' => $member->getKey(),
-            'name' => $member->name,
-            'role' => $member->pivot->role,
-            'departments' => [],
-        ])->all();
+        $rows = $account->members()->with('departments')->orderBy('name')->get()
+            ->map(fn (User $member): array => [
+                'id' => $member->getKey(),
+                'name' => $member->name,
+                'role' => $member->pivot->role,
+                'departments' => $member->departments->sortBy('name')->map(fn ($department): array => [
+                    'id' => $department->getKey(),
+                    'name' => $department->name,
+                    'color' => $department->color,
+                ])->values()->all(),
+            ])->all();
 
         return response()->json(['data' => $rows]);
     }
