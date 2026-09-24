@@ -93,6 +93,11 @@ class Client extends Model
             ->orderBy('tags.name');
     }
 
+    public function processes(): HasMany
+    {
+        return $this->hasMany(Process::class);
+    }
+
     public function scopeSearch(Builder $query, ?string $term): Builder
     {
         return $query->when($term, function (Builder $query, string $term): Builder {

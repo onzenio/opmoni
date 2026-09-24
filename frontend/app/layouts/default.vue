@@ -2,6 +2,7 @@
 import type { NavigationMenuItem } from '@nuxt/ui'
 import { equipeSidebarChildren } from '~/utils/equipeNav'
 import { monitoringSidebarChildren } from '~/utils/monitoringNav'
+import { workSidebarChildren } from '~/utils/workNav'
 
 const route = useRoute()
 const toast = useToast()
@@ -57,6 +58,14 @@ const links = [[{
   label: 'Monitoramento',
   icon: 'i-lucide-radar',
   to: '/monitoring',
+  type: 'trigger',
+  onSelect: () => {
+    open.value = false
+  }
+}, {
+  label: 'Work',
+  icon: 'i-lucide-briefcase',
+  to: '/work',
   type: 'trigger',
   onSelect: () => {
     open.value = false
@@ -142,6 +151,16 @@ const navLinks = computed<NavigationMenuItem[][]>(() => {
         ...item,
         defaultOpen: route.path.startsWith('/monitoring'),
         children: monitoringSidebarChildren(route.path).map(child => ({
+          ...child,
+          onSelect: close
+        }))
+      }
+    }
+    if (item.label === 'Work') {
+      return {
+        ...item,
+        defaultOpen: route.path.startsWith('/work'),
+        children: workSidebarChildren(route.path).map(child => ({
           ...child,
           onSelect: close
         }))

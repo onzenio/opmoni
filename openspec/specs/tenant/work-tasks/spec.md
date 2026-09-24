@@ -1,0 +1,107 @@
+# tenant/work-tasks Specification
+
+## Purpose
+
+Permite que cada Account execute as etapas de cada processo (um por cliente por mês), com ciclo de vida, responsável, prazo em dia fixo, prioridade e bloqueio de cascata, visíveis no calendário, na visão por cliente e no board de tarefas.
+
+## Requirements
+
+### Requirement: Task é etapa de um processo
+The system SHALL represent each task with its Account, process (whose client it inherits — tasks carry NO direct client link), title, department snapshot, optional description, status, due date resolved from the step's fixed day-of-month capped at month length, priority snapshot, optional assignee (a member of the same Account), completion timestamp and order.
+
+#### Scenario: Tasks do PGDAS 03/2026 da empresa X
+- **WHEN** the (PGDAS, client X, 2026-03) process is generated from a two-step blueprint with due days 3 and 5
+- **THEN** two tasks are created in order with due dates 2026-03-03 and 2026-03-05 and initial status A fazer
+
+#### Scenario: Dia 31 em fevereiro
+- **WHEN** a step declares due day 31 and the reference month is February 2026
+- **THEN** the task due date resolves to 2026-02-28
+
+#### Scenario: Responsável fora do account
+- **WHEN** a task assignment names a user who is not a member of the current Account
+- **THEN** the system rejects the request with a validation error
+
+#### Scenario: Isolamento entre escritórios
+- **WHEN** a member of Account A lists or updates a task of Account B
+- **THEN** the list omits it and direct access responds 404
+
+### Requirement: Ciclo de vida da task
+The system SHALL support task statuses A fazer (`todo`), Em progresso (`doing`), Concluída (`done`) and Dispensada (`dismissed`); moving to Concluída SHALL stamp the completion time; moving to Dispensada SHALL stamp the completion time with a required reason; leaving Concluída or Dispensada SHALL clear the stamp.
+
+#### Scenario: Avançar para em progresso
+- **WHEN** an `admin` or `operador` moves a task from A fazer to Em progresso
+- **THEN** the status is persisted and no completion time is set
+
+#### Scenario: Concluir task
+- **WHEN** an authorized member moves a task to Concluída
+- **THEN** the system stores the completion timestamp
+
+#### Scenario: Dispensar task com motivo
+- **WHEN** an authorized member moves a task to Dispensada with a reason
+- **THEN** the system stores the status, the reason and the completion timestamp
+
+#### Scenario: Dispensar sem motivo recusado
+- **WHEN** an authorized member moves a task to Dispensada without a reason
+- **THEN** the system rejects the transition and the task is unchanged
+
+#### Scenario: Reabrir task concluída
+- **WHEN** an authorized member moves a Concluída task back to Em progresso
+- **THEN** the completion timestamp is cleared
+
+#### Scenario: User tenta alterar task
+- **WHEN** a `user` member attempts to change a task
+- **THEN** the system responds 403 and the task is unchanged
+
+### Requirement: Bloqueio de cascata
+The system SHALL, for processes whose template has cascade enabled, refuse advancing a task beyond A fazer while any earlier-order task of the same process is neither Concluída nor Dispensada; templates with cascade disabled SHALL allow any order.
+
+#### Scenario: Furar sequência bloqueado
+- **WHEN** an authorized member tries to move step 2 to Em progresso while step 1 is still A fazer in a cascade process
+- **THEN** the system rejects the transition and step 2 stays A fazer
+
+#### Scenario: Etapa dispensada libera a seguinte
+- **WHEN** step 1 is Dispensada and an authorized member advances step 2 in a cascade process
+- **THEN** the transition succeeds
+
+#### Scenario: Sem cascata libera ordem
+- **WHEN** the template has cascade disabled and step 2 advances while step 1 is A fazer
+- **THEN** the transition succeeds
+
+### Requirement: Listagem com filtros operacionais
+The system SHALL provide task listing filterable by process, client (via the process), status, assignee, department, priority and due-date range, ordered by due date (tasks without due date last) and then by order.
+
+#### Scenario: Filtrar por responsável e status
+- **WHEN** a member filters tasks by assignee self and status Em progresso
+- **THEN** only matching tasks of the current Account are returned
+
+### Requirement: Feed do calendário (só com prazo)
+The system SHALL provide a calendar feed over a date range returning only tasks that have a due date, each entry carrying task, process, client (via process) and assignee presentation data.
+
+#### Scenario: Tasks sem prazo ficam fora
+- **WHEN** the calendar feed is requested for March 2026 and one task has no due date
+- **THEN** that task is omitted from the feed while dated tasks in range are returned
+
+### Requirement: Kanban por status com card fiscal
+The system SHALL support a kanban view with exactly four columns matching the lifecycle (A fazer, Em progresso, Concluída, Dispensada); each card SHALL display process name + reference month, client name, due date, assignee, priority and department, plus a lock marker when cascade blocks the task; status changes happen through explicit advance/return buttons calling the task API (no drag-and-drop in v1); the board SHALL share the same task listing filters (process, client, assignee, department, priority, due range).
+
+#### Scenario: Board das tasks de março
+- **WHEN** a member opens the tasks board filtered to March 2026
+- **THEN** every dated task appears in its status column with process, client, due date, assignee and priority visible
+
+#### Scenario: Avanço pelo board respeita cascata
+- **WHEN** an authorized member clicks advance on a cascade-blocked card
+- **THEN** the API refuses, the card stays in place and the board shows the refusal feedback with the lock marker kept
+
+### Requirement: Agregação por cliente para a visão agrupada
+The system SHALL provide a client-grouped task payload that the frontend renders as Cliente > Processo > Task (the `getGroupedRowModel` pattern with `grouping ['client_id','process_id']`), carrying per-client and per-process totals and completion ratios.
+
+#### Scenario: Agrupamento cliente-processo-task
+- **WHEN** the grouped payload is requested for March 2026
+- **THEN** each client entry lists its processes of the month and each process lists its tasks with statuses
+
+### Requirement: Auditoria de suporte
+The system SHALL record task writes performed in support mode in the support audit log.
+
+#### Scenario: Escrita em suporte auditada
+- **WHEN** a super_admin in support mode concludes a task
+- **THEN** the write is recorded in the support log with resource, verb and identifiers

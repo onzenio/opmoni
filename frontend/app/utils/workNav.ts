@@ -1,0 +1,24 @@
+import type { NavigationMenuItem } from '@nuxt/ui'
+
+export interface WorkNavItem {
+  label: string
+  icon: string
+  to: string
+}
+
+export const workNav: readonly WorkNavItem[] = [
+  { label: 'Calendário', icon: 'i-lucide-calendar-days', to: '/work/calendario' },
+  { label: 'Clientes', icon: 'i-lucide-users', to: '/work/clientes' },
+  { label: 'Processos', icon: 'i-lucide-layers', to: '/work/processos' },
+  { label: 'Tarefas', icon: 'i-lucide-kanban-square', to: '/work/tarefas' },
+  { label: 'Modelos', icon: 'i-lucide-shapes', to: '/work/modelos' }
+]
+
+export function workSidebarChildren(path: string): NavigationMenuItem[] {
+  return workNav.map(item => ({
+    label: item.label,
+    icon: item.icon,
+    to: item.to,
+    active: path === item.to || path.startsWith(`${item.to}/`)
+  }))
+}

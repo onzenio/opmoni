@@ -68,4 +68,14 @@ class Account extends Model
     {
         return $this->hasMany(Process::class);
     }
+
+    public function processTemplates(): HasMany
+    {
+        return $this->hasMany(ProcessTemplate::class);
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
 }

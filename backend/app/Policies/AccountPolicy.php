@@ -36,6 +36,16 @@ class AccountPolicy
     }
 
     /**
+     * Reading the member list requires any membership in the current tenant
+     * (super_admin in support acts as admin). Inviting, updating or removing
+     * members still requires `manageMembers` (account `admin`).
+     */
+    public function viewMembers(User $user, Account $account): bool
+    {
+        return $this->tenantId() === $account->getKey() && $this->tenantRole($user) !== null;
+    }
+
+    /**
      * Inviting or removing members requires the account `admin` role
      * within the current tenant (super_admin in support acts as admin).
      */

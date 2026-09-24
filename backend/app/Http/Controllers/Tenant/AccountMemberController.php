@@ -18,7 +18,7 @@ class AccountMemberController extends Controller
     public function index(): JsonResponse
     {
         $account = $this->tenantAccount();
-        Gate::authorize('manageMembers', $account);
+        Gate::authorize('viewMembers', $account);
 
         return response()->json($this->presentMembers($account));
     }
@@ -79,7 +79,7 @@ class AccountMemberController extends Controller
     public function show(User $member): JsonResponse
     {
         $account = $this->tenantAccount();
-        Gate::authorize('manageMembers', $account);
+        Gate::authorize('viewMembers', $account);
 
         $role = $member->accountRole($account);
 

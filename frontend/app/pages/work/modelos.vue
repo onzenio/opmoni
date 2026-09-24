@@ -1,0 +1,171 @@
+<script setup lang="ts">
+import type { WorkTemplate } from '~/types/work'
+import { taxRegimeLabel } from '~/utils/portfolioLabels'
+import type { TaxRegime } from '~/types/client'
+
+definePageMeta({ middleware: 'auth' })
+
+const toast = useToast()
+const { canManageClients } = useAuth()
+const { listTemplates } = useWork()
+
+const { data, status, error, refresh } = await useAsyncData<WorkTemplate[]>(
+  'work-modelos',
+  () => listTemplates()
+)
+
+const templates = computed<WorkTemplate[]>(() => data.value ?? [])
+const isLoading = computed(() => status.value === 'pending')
+
+function regimeBadges(template: WorkTemplate): string[] {
+  if (!template.regimes || template.regimes.length === 0) return ['Todos']
+  return template.regimes.map(regime => taxRegimeLabel[regime as TaxRegime] ?? regime)
+}
+
+function recurrenceLabel(template: WorkTemplate): string {
+  return `Gera dia ${template.generate_day} · vence dia ${template.due_day}`
+}
+
+function departmentSummary(template: WorkTemplate): string {
+  const departments = [...new Set((template.steps ?? []).map(step => step.department).filter(Boolean))]
+  if (departments.length === 0) return '—'
+  if (departments.length <= 2) return departments.join(', ')
+  return `${departments.slice(0, 2).join(', ')} +${departments.length - 2}`
+}
+
+function clientSummary(template: WorkTemplate): string {
+  const added = (template.exceptions ?? []).filter(exception => exception.kind === 'added').length
+  const removed = (template.exceptions ?? []).filter(exception => exception.kind === 'removed').length
+  const tagCount = template.tags?.length ?? 0
+  const parts: string[] = []
+  if (tagCount > 0) parts.push(`${tagCount} tag(s)`)
+  else parts.push('Pela regra')
+  if (added > 0) parts.push(`+${added} incluído(s)`)
+  if (removed > 0) parts.push(`-${removed} excluído(s)`)
+  return parts.join(' · ')
+}
+
+async function onRefresh() {
+  try {
+    await refresh()
+  } catch {
+    toast.add({ title: 'Não foi possível atualizar os modelos', color: 'error' })
+  }
+}
+
+watch(error, (value) => {
+  if (value) toast.add({ title: 'Não foi possível carregar os modelos', color: 'error' })
+})
+</script>
+
+<template>
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-3 sm:gap-5 sm:p-4 lg:p-5">
+    <header class="flex min-w-0 flex-wrap items-center gap-2">
+      <div class="flex min-w-0 flex-1 items-center gap-2.5">
+        <UIcon name="i-lucide-shapes" class="size-5 shrink-0 text-primary" />
+        <h2 class="truncate text-base font-semibold tracking-tight text-highlighted sm:text-lg">
+          Modelos
+        </h2>
+      </div>
+      <UButton
+        v-if="canManageClients"
+        label="Novo modelo"
+        icon="i-lucide-plus"
+        color="primary"
+        size="sm"
+        to="/work/modelos/novo"
+      />
+      <UButton
+        icon="i-lucide-refresh-cw"
+        color="neutral"
+        variant="ghost"
+        aria-label="Atualizar modelos"
+        :loading="isLoading"
+        @click="onRefresh"
+      />
+    </header>
+
+    <UAlert
+      v-if="error"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-circle-alert"
+      title="Não foi possível carregar os modelos"
+      description="Verifique sua conexão e tente novamente."
+      :actions="[{ label: 'Tentar novamente', color: 'error', variant: 'solid', onClick: () => onRefresh() }]"
+    />
+
+    <div v-else-if="isLoading && templates.length === 0" class="flex flex-col gap-3">
+      <USkeleton v-for="index in 4" :key="index" class="h-24 w-full rounded-xl" />
+    </div>
+
+    <UEmpty
+      v-else-if="templates.length === 0"
+      icon="i-lucide-shapes"
+      title="Nenhum modelo cadastrado"
+      description="Os modelos definem as rotinas mensais que geram um processo por cliente."
+      variant="naked"
+      :actions="canManageClients ? [{ label: 'Criar modelo', icon: 'i-lucide-plus', to: '/work/modelos/novo' }] : [{ label: 'Atualizar', icon: 'i-lucide-refresh-cw', onClick: () => onRefresh() }]"
+    />
+
+    <UCard v-else variant="subtle" :ui="{ body: 'p-0 sm:p-0' }">
+      <UTable
+        :data="templates"
+        :columns="[
+          { accessorKey: 'name', header: 'Título' },
+          { accessorKey: 'regimes', header: 'Regimes' },
+          { accessorKey: 'tags', header: 'Categorias/Tags' },
+          { accessorKey: 'steps', header: 'Departamentos' },
+          { id: 'clients', header: 'Clientes' },
+          { id: 'recurrence', header: 'Recorrência' }
+        ]"
+      >
+        <template #name-cell="{ row }">
+          <div class="flex min-w-0 items-center gap-2">
+            <NuxtLink :to="`/work/modelos/${row.original.id}`" class="min-w-0 flex-1 truncate text-sm font-medium text-primary hover:underline" :title="row.original.name">
+              {{ row.original.name }}
+            </NuxtLink>
+            <UBadge
+              v-if="!row.original.is_active"
+              color="neutral"
+              variant="subtle"
+              label="Inativo"
+            />
+          </div>
+        </template>
+        <template #regimes-cell="{ row }">
+          <div class="flex max-w-52 flex-wrap gap-1">
+            <UBadge
+              v-for="label in regimeBadges(row.original)"
+              :key="label"
+              color="info"
+              variant="subtle"
+              :label="label"
+            />
+          </div>
+        </template>
+        <template #tags-cell="{ row }">
+          <div class="flex max-w-52 flex-wrap gap-1">
+            <span v-if="!row.original.tags || row.original.tags.length === 0" class="text-xs text-muted">—</span>
+            <UBadge
+              v-for="tag in (row.original.tags ?? [])"
+              :key="tag.id"
+              color="neutral"
+              variant="subtle"
+              :label="tag.name"
+            />
+          </div>
+        </template>
+        <template #steps-cell="{ row }">
+          <span class="text-sm text-muted">{{ departmentSummary(row.original) }}</span>
+        </template>
+        <template #clients-cell="{ row }">
+          <span class="text-sm text-muted">{{ clientSummary(row.original) }}</span>
+        </template>
+        <template #recurrence-cell="{ row }">
+          <span class="text-sm text-muted">{{ recurrenceLabel(row.original) }}</span>
+        </template>
+      </UTable>
+    </UCard>
+  </div>
+</template>
