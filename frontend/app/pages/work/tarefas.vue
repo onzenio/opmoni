@@ -58,19 +58,47 @@ const { data, status, error, refresh } = await useAsyncData<WorkTask[]>(
 const tasks = computed<WorkTask[]>(() => data.value ?? [])
 const isLoading = computed(() => status.value === 'pending')
 
-const { data: members } = await useAsyncData(
+const { data: members, error: membersError, refresh: refreshMembersData } = await useAsyncData(
   'work-members',
   async () => {
     if (!canManageClients.value) return [] as { id: number, name: string }[]
     const res = await $api<{ data?: { id: number, name: string }[] } | { id: number, name: string }[]>('/account/members')
     return Array.isArray(res) ? res : (res.data ?? [])
   },
-  { default: () => [] as { id: number, name: string }[] }
+  { default: () => [] as { id: number, name: string }[], watch: [canManageClients] }
 )
+
+const membersFailed = computed(() => membersError.value !== null && membersError.value !== undefined)
+const membersForbidden = computed(() => apiStatus(membersError.value) === 403)
+
+const membersHint = computed(() => {
+  if (!membersFailed.value) return undefined
+  return membersForbidden.value
+    ? 'Lista de membros indisponível para sua função.'
+    : 'Não foi possível carregar os responsáveis.'
+})
+
+function membersWarning(): { title: string, description: string, color: 'warning' } {
+  return {
+    title: 'Não foi possível carregar os responsáveis',
+    description: membersHint.value ?? 'A atribuição pode estar indisponível.',
+    color: 'warning'
+  }
+}
 
 const memberOptions = computed<MemberOption[]>(() =>
   (members.value ?? []).map(member => ({ label: member.name, value: member.id }))
 )
+
+const assigneeItems = computed(() => [
+  { label: 'Sem responsável', value: null },
+  ...memberOptions.value
+])
+
+const assigneeFilterItems = computed(() => [
+  { label: 'Todos', value: '' },
+  ...memberOptions.value.map(option => ({ label: option.label, value: String(option.value) }))
+])
 
 function memberName(memberId: number | null): string {
   if (memberId === null) return 'Sem responsável'
@@ -137,6 +165,18 @@ function apiMessage(error: unknown): string | undefined {
   return typeof message === 'string' && message.length > 0 ? message : undefined
 }
 
+function apiStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined
+  const record = error as {
+    status?: number
+    statusCode?: number
+    response?: { status?: number, _data?: { message?: string } }
+    data?: { status?: number, message?: string }
+  }
+  const status = record.status ?? record.statusCode ?? record.response?.status ?? record.data?.status
+  return typeof status === 'number' ? status : undefined
+}
+
 const busyId = ref<number | null>(null)
 
 async function advance(task: WorkTask) {
@@ -149,8 +189,12 @@ async function advance(task: WorkTask) {
     await refresh()
     toast.add({ title: next === 'done' ? 'Tarefa concluída' : 'Tarefa em progresso', color: 'success' })
   } catch (error: unknown) {
-    markLocked(task.id)
-    toast.add({ title: 'Avanço bloqueado pela cascata', description: apiMessage(error) ?? 'Aguardando etapas anteriores.', color: 'warning' })
+    if (apiStatus(error) === 422) {
+      markLocked(task.id)
+      toast.add({ title: 'Avanço bloqueado', description: apiMessage(error) ?? 'Aguardando etapas anteriores.', color: 'warning' })
+    } else {
+      toast.add({ title: 'Não foi possível avançar a tarefa', description: apiMessage(error), color: 'error' })
+    }
   } finally {
     busyId.value = null
   }
@@ -252,6 +296,14 @@ watch(error, (value) => {
   if (value) toast.add({ title: 'Não foi possível carregar as tarefas', color: 'error' })
 })
 
+watch(membersError, (value) => {
+  if (value && canManageClients.value) toast.add(membersWarning())
+})
+
+watch(canManageClients, (value) => {
+  if (value) void refreshMembersData()
+})
+
 watch(dismissOpen, (open) => {
   if (!open) {
     dismissTarget.value = null
@@ -340,10 +392,15 @@ watch(dismissOpen, (open) => {
         <UFormField label="Vencimento até" name="due_to">
           <UInput v-model="filters.dueTo" type="date" class="w-full" />
         </UFormField>
-        <UFormField v-if="canManageClients" label="Responsável" name="assignee">
+        <UFormField
+          v-if="canManageClients"
+          label="Responsável"
+          name="assignee"
+          :hint="membersHint"
+        >
           <USelect
             v-model="filters.assigneeId"
-            :items="[{ label: 'Todos', value: '' }, ...memberOptions.map(option => ({ label: option.label, value: String(option.value) }))]"
+            :items="assigneeFilterItems"
             placeholder="Todos"
             class="w-full"
           />
@@ -482,16 +539,19 @@ watch(dismissOpen, (open) => {
           <USelectMenu
             v-if="canManageClients"
             :model-value="assigneeModel(task)"
-            :items="[{ label: 'Sem responsável', value: null }, ...memberOptions]"
+            :items="assigneeItems"
             value-key="value"
             label-key="label"
-            placeholder="Atribuir responsável"
+            :placeholder="membersFailed ? (membersHint ?? 'Responsáveis indisponíveis') : 'Atribuir responsável'"
             :search-input="{ placeholder: 'Buscar membro...' }"
             :loading="busyId === task.id"
-            :disabled="busyId === task.id"
+            :disabled="busyId === task.id || membersFailed"
             class="w-full"
             @update:model-value="(value: number | null) => assign(task, value)"
           />
+          <p v-if="canManageClients && membersFailed" class="text-xs text-muted">
+            {{ membersHint }}
+          </p>
 
           <div v-if="canManageClients" class="flex flex-wrap gap-1.5">
             <UButton
