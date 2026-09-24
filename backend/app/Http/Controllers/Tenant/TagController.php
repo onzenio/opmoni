@@ -20,7 +20,7 @@ class TagController extends Controller
     {
         Gate::authorize('viewAny', Tag::class);
 
-        return TagResource::collection(Tag::query()->orderBy('name')->get());
+        return TagResource::collection(Tag::query()->orderBy('name')->paginate(25));
     }
 
     public function store(StoreTagRequest $request): JsonResponse

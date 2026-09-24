@@ -6,10 +6,12 @@ use App\Enums\ClientStatus;
 use App\Enums\DeadlineStatus;
 use App\Models\Client;
 use App\Support\BrazilianRegions;
+use App\Tenant\CurrentTenant;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class ClientPortfolio
 {
@@ -63,6 +65,24 @@ class ClientPortfolio
      */
     public function counts(array $filters): array
     {
+        $accountId = resolve(CurrentTenant::class)->accountId;
+        $key = 'portfolio:counts:'.$accountId.':'.md5((string) json_encode($filters));
+
+        return Cache::remember($key, 60, fn (): array => $this->countsUncached($filters));
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array{
+     *     total: int,
+     *     active: int,
+     *     inactive: int,
+     *     certificate: array<string, int>,
+     *     poa: array<string, int>
+     * }
+     */
+    public function countsUncached(array $filters): array
+    {
         unset($filters['view']);
         $base = $this->filtered($filters);
         $statuses = array_map(fn (DeadlineStatus $status): string => $status->value, DeadlineStatus::cases());
@@ -103,6 +123,30 @@ class ClientPortfolio
      * }
      */
     public function analytics(array $filters): array
+    {
+        $accountId = resolve(CurrentTenant::class)->accountId;
+        $key = 'portfolio:analytics:'.$accountId.':'.md5((string) json_encode($filters));
+
+        return Cache::remember($key, 60, fn (): array => $this->analyticsUncached($filters));
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array{
+     *     by_state: list<array{key: string, count: int}>,
+     *     by_region: list<array{key: string, count: int}>,
+     *     by_city: list<array{key: string, count: int}>,
+     *     by_tax_regime: list<array{key: string, count: int}>,
+     *     by_legal_nature: list<array{key: string, count: int}>,
+     *     by_activity: list<array{key: string, label: string|null, count: int}>,
+     *     growth_by_month: list<array{key: string, count: int}>,
+     *     attention: array{
+     *         certificate: list<array{id: int, name: string, tax_id: string|null, status: string, expires_at: string|null}>,
+     *         poa: list<array{id: int, name: string, tax_id: string|null, status: string, expires_at: string|null}>
+     *     }
+     * }
+     */
+    public function analyticsUncached(array $filters): array
     {
         unset($filters['view']);
         $base = $this->filtered($filters);

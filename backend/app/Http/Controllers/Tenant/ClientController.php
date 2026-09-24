@@ -46,7 +46,7 @@ class ClientController extends Controller
         );
 
         if ($request->boolean('all')) {
-            $clients = $clients->get();
+            $clients = $clients->limit((int) config('clients.sheet_limit'))->get();
 
             return ClientResource::collection($clients)->additional([
                 'meta' => ['total' => $clients->count()],
