@@ -59,6 +59,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::apiResource('monitorings', SerproMonitoringController::class);
     Route::apiResource('documents', DocumentController::class);
     Route::apiResource('processes', ProcessController::class);
+    Route::get('account/members/directory', [AccountMemberController::class, 'directory']);
     Route::apiResource('account/members', AccountMemberController::class)->parameter('members', 'member');
 });
 

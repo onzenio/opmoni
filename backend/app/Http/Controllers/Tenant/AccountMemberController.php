@@ -56,6 +56,21 @@ class AccountMemberController extends Controller
         return response()->json($this->presentMember($member, $data['role']), 201);
     }
 
+    public function directory(): JsonResponse
+    {
+        $account = $this->tenantAccount();
+        Gate::authorize('viewMembers', $account);
+
+        $rows = $account->members()->orderBy('name')->get()->map(fn (User $member): array => [
+            'id' => $member->getKey(),
+            'name' => $member->name,
+            'role' => $member->pivot->role,
+            'departments' => [],
+        ])->all();
+
+        return response()->json(['data' => $rows]);
+    }
+
     public function show(User $member): JsonResponse
     {
         $account = $this->tenantAccount();
