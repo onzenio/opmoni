@@ -1,0 +1,68 @@
+<?php
+
+namespace Tests\Feature\Tenancy;
+
+use App\Enums\TaxRegime;
+use App\Models\Account;
+use App\Models\AccountUser;
+use App\Models\Client;
+use App\Models\ProcessTemplate;
+use App\Models\Tag;
+use App\Models\User;
+use App\Services\ProcessGenerationService;
+use Carbon\Carbon;
+use Database\Seeders\PlanSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class WorkGenerationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(PlanSeeder::class);
+    }
+
+    public function test_generate_creates_one_process_per_eligible_and_is_idempotent(): void
+    {
+        $account = Account::factory()->create();
+        $member = $this->memberOf($account, 'admin');
+        $this->actingAs($member, 'sanctum');
+
+        $tag = Tag::factory()->create(['account_id' => $account->getKey()]);
+        $template = ProcessTemplate::factory()->create([
+            'account_id' => $account->getKey(), 'name' => 'PGDAS',
+            'regimes' => [TaxRegime::SimpleNational->value], 'cascade' => true,
+        ]);
+        $template->tags()->attach($tag->getKey(), ['account_id' => $account->getKey()]);
+        $template->steps()->create(['account_id' => $account->getKey(), 'title' => 'Apurar', 'department' => 'Fiscal', 'due_day' => 3, 'priority' => 'medium', 'order' => 1]);
+        $template->steps()->create(['account_id' => $account->getKey(), 'title' => 'Transmitir', 'department' => 'Fiscal', 'due_day' => 31, 'priority' => 'high', 'order' => 2]);
+
+        $ok = Client::factory()->company()->create(['account_id' => $account->getKey(), 'tax_regime' => TaxRegime::SimpleNational, 'status' => 'active']);
+        $ok->tags()->attach($tag->getKey(), ['account_id' => $account->getKey()]);
+        $out = Client::factory()->company()->create(['account_id' => $account->getKey(), 'tax_regime' => TaxRegime::PresumedProfit, 'status' => 'active']);
+
+        $month = Carbon::create(2026, 2, 1)->startOfDay();
+        $first = app(ProcessGenerationService::class)->generate($template, $month);
+        $second = app(ProcessGenerationService::class)->generate($template, $month);
+
+        $this->assertCount(1, $first);
+        $this->assertCount(1, $second);
+        $this->assertSame($first->first()->getKey(), $second->first()->getKey());
+        $this->assertDatabaseCount('processes', 1);
+        // due_day 31 em fevereiro limita ao dia 28 (coluna date persiste como datetime no SQLite)
+        $this->assertDatabaseHas('tasks', ['process_id' => $first->first()->getKey(), 'due_on' => '2026-02-28 00:00:00', 'status' => 'todo']);
+        $this->assertDatabaseMissing('processes', ['client_id' => $out->getKey()]);
+    }
+
+    private function memberOf(Account $account, string $role): User
+    {
+        $user = User::factory()->create();
+        AccountUser::create(['account_id' => $account->getKey(), 'user_id' => $user->getKey(), 'role' => $role]);
+        $user->forceFill(['current_account_id' => $account->getKey()])->save();
+
+        return $user->refresh();
+    }
+}
