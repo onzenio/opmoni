@@ -82,7 +82,8 @@ class WorkProcessTest extends TestCase
 
         $this->getJson("/api/processes?template_id={$template->getKey()}&reference_month=2026-03")
             ->assertOk()
-            ->assertJsonPath('data.0.id', $process->getKey());
+            ->assertJsonPath('data.0.id', $process->getKey())
+            ->assertJsonCount(1, 'data');
 
         $this->getJson("/api/processes?template_id={$template->getKey()}&reference_month=2026-04")
             ->assertOk()
