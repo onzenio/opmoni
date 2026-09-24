@@ -56,7 +56,7 @@ class ProcessGenerationService
                     'account_id' => $template->account_id,
                     'template_id' => $template->getKey(),
                     'client_id' => $client->getKey(),
-                ])->whereDate('reference_month', $referenceDate)->first();
+                ])->whereDate('reference_month', $referenceDate)->lockForUpdate()->first();
 
                 if ($existing instanceof Process) {
                     return $existing;
