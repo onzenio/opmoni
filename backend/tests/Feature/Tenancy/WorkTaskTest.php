@@ -134,6 +134,54 @@ class WorkTaskTest extends TestCase
             ->assertJsonPath('data.0.processes.0.tasks.0.title', 'Com data');
     }
 
+    public function test_reassign_without_status_change_skips_reason_and_cascade_guards(): void
+    {
+        $account = Account::factory()->create();
+        $admin = $this->memberOf($account, 'admin');
+        $assignee = $this->memberOf($account, 'operador');
+        $this->actingAs($admin, 'sanctum');
+
+        $template = ProcessTemplate::factory()->create([
+            'account_id' => $account->getKey(),
+            'cascade' => true,
+        ]);
+        $process = Process::factory()->create([
+            'account_id' => $account->getKey(),
+            'template_id' => $template->getKey(),
+        ]);
+        Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'order' => 1,
+            'title' => 'Etapa 1',
+        ]);
+        $blockedDoing = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'order' => 2,
+            'title' => 'Etapa 2',
+            'status' => 'doing',
+        ]);
+        $dismissed = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'order' => 3,
+            'title' => 'Etapa 3',
+            'status' => 'dismissed',
+            'dismissal_reason' => 'Sem movimento',
+        ]);
+
+        $this->patchJson("/api/tasks/{$dismissed->getKey()}", ['assignee_member_id' => $assignee->getKey()])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'dismissed')
+            ->assertJsonPath('data.assignee_member_id', $assignee->getKey());
+
+        $this->patchJson("/api/tasks/{$blockedDoing->getKey()}", ['assignee_member_id' => $assignee->getKey()])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'doing')
+            ->assertJsonPath('data.assignee_member_id', $assignee->getKey());
+    }
+
     private function memberOf(Account $account, string $role): User
     {
         $user = User::factory()->create();

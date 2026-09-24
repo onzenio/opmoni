@@ -64,15 +64,16 @@ class TaskController extends Controller
 
         $from = $task->status instanceof TaskStatus ? $task->status->value : (string) $task->status;
         $to = $data['status'] ?? $from;
+        $statusChanging = array_key_exists('status', $data) && $data['status'] !== $from;
 
-        if ($to === TaskStatus::Dismissed->value && empty($data['dismissal_reason'])) {
+        if ($statusChanging && $to === TaskStatus::Dismissed->value && empty($data['dismissal_reason'])) {
             abort(response()->json([
                 'message' => 'Motivo obrigatório ao dispensar.',
                 'errors' => ['dismissal_reason' => ['Motivo obrigatório.']],
             ], 422));
         }
 
-        if ($to !== TaskStatus::Todo->value && $task->process->template?->cascade) {
+        if ($statusChanging && $to !== TaskStatus::Todo->value && $task->process->template?->cascade) {
             $blocked = $task->process->tasks()
                 ->where('order', '<', $task->order)
                 ->whereNotIn('status', [TaskStatus::Done->value, TaskStatus::Dismissed->value])
@@ -87,12 +88,14 @@ class TaskController extends Controller
 
         $task->status = $to;
 
-        if (in_array($to, [TaskStatus::Done->value, TaskStatus::Dismissed->value], true)) {
-            $task->completed_at ??= now();
-            $task->dismissal_reason = $to === TaskStatus::Dismissed->value ? $data['dismissal_reason'] : null;
-        } else {
-            $task->completed_at = null;
-            $task->dismissal_reason = null;
+        if ($statusChanging) {
+            if (in_array($to, [TaskStatus::Done->value, TaskStatus::Dismissed->value], true)) {
+                $task->completed_at ??= now();
+                $task->dismissal_reason = $to === TaskStatus::Dismissed->value ? $data['dismissal_reason'] : null;
+            } else {
+                $task->completed_at = null;
+                $task->dismissal_reason = null;
+            }
         }
 
         if (array_key_exists('assignee_member_id', $data)) {
