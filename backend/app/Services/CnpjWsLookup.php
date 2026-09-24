@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Tenant\CurrentTenant;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -10,8 +11,6 @@ use Illuminate\Support\Facades\RateLimiter;
 final class CnpjWsLookup
 {
     private const CACHE_TTL_SECONDS = 86400;
-
-    private const RATE_KEY = 'cnpj-ws:public';
 
     public function __construct(private BrazilianTaxId $taxId) {}
 
@@ -26,10 +25,13 @@ final class CnpjWsLookup
             throw new CnpjLookupException('CNPJ inválido.', 422);
         }
 
-        return Cache::remember("cnpj-ws:{$normalized}", self::CACHE_TTL_SECONDS, function () use ($normalized): array {
+        $accountId = resolve(CurrentTenant::class)->accountId;
+        $rateKey = 'cnpj-ws:'.($accountId ?? 'public');
+
+        return Cache::remember("cnpj-ws:{$normalized}", self::CACHE_TTL_SECONDS, function () use ($normalized, $rateKey): array {
             $result = null;
             $exception = null;
-            $allowed = RateLimiter::attempt(self::RATE_KEY, 3, function () use ($normalized, &$result, &$exception): bool {
+            $allowed = RateLimiter::attempt($rateKey, 3, function () use ($normalized, &$result, &$exception): bool {
                 try {
                     $result = $this->request($normalized);
                 } catch (\Throwable $caught) {
