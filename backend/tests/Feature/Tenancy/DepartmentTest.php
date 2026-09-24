@@ -5,7 +5,9 @@ namespace Tests\Feature\Tenancy;
 use App\Models\Account;
 use App\Models\AccountUser;
 use App\Models\Department;
+use App\Models\ProcessTemplate;
 use App\Models\SupportAccessLog;
+use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -209,6 +211,77 @@ class DepartmentTest extends TestCase
         $log = SupportAccessLog::firstWhere(['action' => 'create', 'account_id' => $target->getKey()]);
         $this->assertSame('departments', $log->metadata['resource']);
         $this->assertSame($departmentId, $log->metadata['resource_id']);
+    }
+
+    public function test_destroy_is_blocked_when_used_by_template_steps(): void
+    {
+        $account = Account::factory()->create();
+        $other = Account::factory()->create();
+        $operador = $this->memberOf($account, 'operador');
+        $this->actingAs($operador, 'sanctum');
+
+        $departmentId = $this->postJson('/api/departments', [
+            'name' => 'Fiscal',
+            'color' => 'success',
+        ])->assertCreated()->json('data.id');
+
+        $template = ProcessTemplate::factory()->create(['account_id' => $account->getKey()]);
+        $template->steps()->create([
+            'account_id' => $account->getKey(), 'title' => 'Apurar', 'department' => 'fiscal',
+            'due_day' => 3, 'priority' => 'medium', 'order' => 1,
+        ]);
+
+        $foreignTemplate = ProcessTemplate::factory()->create(['account_id' => $other->getKey()]);
+        $foreignTemplate->steps()->create([
+            'account_id' => $other->getKey(), 'title' => 'Apurar', 'department' => 'Fiscal',
+            'due_day' => 3, 'priority' => 'medium', 'order' => 1,
+        ]);
+
+        $this->deleteJson("/api/departments/{$departmentId}")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['department']);
+
+        $this->assertDatabaseHas('departments', ['id' => $departmentId]);
+
+        $template->steps()->delete();
+
+        $this->deleteJson("/api/departments/{$departmentId}")->assertNoContent();
+        $this->assertDatabaseMissing('departments', ['id' => $departmentId]);
+    }
+
+    public function test_destroy_is_blocked_by_open_tasks_but_not_closed_ones(): void
+    {
+        $account = Account::factory()->create();
+        $operador = $this->memberOf($account, 'operador');
+        $this->actingAs($operador, 'sanctum');
+
+        $departmentId = $this->postJson('/api/departments', [
+            'name' => 'Fiscal',
+            'color' => 'success',
+        ])->assertCreated()->json('data.id');
+
+        $open = Task::factory()->create([
+            'account_id' => $account->getKey(), 'department' => 'Fiscal', 'status' => 'doing',
+        ]);
+        Task::factory()->create([
+            'account_id' => $account->getKey(), 'department' => 'Fiscal', 'status' => 'done',
+        ]);
+        Task::factory()->create([
+            'account_id' => $account->getKey(), 'department' => 'Fiscal', 'status' => 'dismissed',
+            'dismissal_reason' => 'Sem movimento',
+        ]);
+
+        $this->deleteJson("/api/departments/{$departmentId}")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['department']);
+
+        $this->assertDatabaseHas('departments', ['id' => $departmentId]);
+
+        $open->forceFill(['status' => 'done'])->save();
+
+        $this->deleteJson("/api/departments/{$departmentId}")->assertNoContent();
+        $this->assertDatabaseMissing('departments', ['id' => $departmentId]);
+        $this->assertDatabaseCount('tasks', 3);
     }
 
     /**

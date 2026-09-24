@@ -6,10 +6,12 @@ use App\Enums\TaskStatus;
 use App\Models\Client;
 use App\Models\Process;
 use App\Models\ProcessTemplate;
+use App\Models\ProcessTemplateTask;
 use App\Tenant\CurrentTenant;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProcessGenerationService
 {
@@ -52,7 +54,7 @@ class ProcessGenerationService
                     'status' => TaskStatus::Todo->value,
                     'due_on' => $this->resolveDueDate($reference, (int) $step->due_day),
                     'priority' => $step->priority,
-                    'assignee_member_id' => $step->default_assignee_member_id,
+                    'assignee_member_id' => $this->resolveAssignee($template->account_id, $step),
                     'order' => $step->order,
                 ]);
             }
@@ -110,5 +112,35 @@ class ProcessGenerationService
         $capped = min(max($day, 1), $reference->daysInMonth);
 
         return $reference->copy()->day($capped)->toDateString();
+    }
+
+    /**
+     * A geração agendada não pode falhar o mês inteiro por um responsável
+     * fora do departamento (ex.: saiu do time após a escrita do modelo):
+     * gera a task com responsável nulo e registra auditoria em log.
+     */
+    private function resolveAssignee(int $accountId, ProcessTemplateTask $step): ?int
+    {
+        $assignee = $step->default_assignee_member_id;
+
+        if ($assignee === null) {
+            return null;
+        }
+
+        $departmentId = DepartmentMembership::findId($accountId, $step->department);
+
+        if ($departmentId !== null && ! DepartmentMembership::memberBelongs($accountId, $departmentId, (int) $assignee)) {
+            Log::warning('work.generation.assignee_outside_department', [
+                'account_id' => $accountId,
+                'template_id' => $step->template_id,
+                'step_id' => $step->getKey(),
+                'department' => $step->department,
+                'assignee_member_id' => (int) $assignee,
+            ]);
+
+            return null;
+        }
+
+        return (int) $assignee;
     }
 }

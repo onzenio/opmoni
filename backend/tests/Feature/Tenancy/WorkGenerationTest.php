@@ -6,6 +6,7 @@ use App\Enums\TaxRegime;
 use App\Models\Account;
 use App\Models\AccountUser;
 use App\Models\Client;
+use App\Models\Department;
 use App\Models\ProcessTemplate;
 use App\Models\Tag;
 use App\Models\User;
@@ -55,6 +56,41 @@ class WorkGenerationTest extends TestCase
         // due_day 31 em fevereiro limita ao dia 28 (coluna date persiste como datetime no SQLite)
         $this->assertDatabaseHas('tasks', ['process_id' => $first->first()->getKey(), 'due_on' => '2026-02-28 00:00:00', 'status' => 'todo']);
         $this->assertDatabaseMissing('processes', ['client_id' => $out->getKey()]);
+    }
+
+    public function test_generate_nulls_assignee_outside_step_department(): void
+    {
+        $account = Account::factory()->create();
+        $member = $this->memberOf($account, 'admin');
+        $this->actingAs($member, 'sanctum');
+
+        $outsider = $this->memberOf($account, 'operador');
+        $insider = $this->memberOf($account, 'operador');
+        $department = Department::factory()->create(['account_id' => $account->getKey(), 'name' => 'Fiscal']);
+        $department->members()->attach($insider->getKey(), ['account_id' => $account->getKey()]);
+
+        $template = ProcessTemplate::factory()->create(['account_id' => $account->getKey(), 'name' => 'PGDAS']);
+        $template->steps()->create([
+            'account_id' => $account->getKey(), 'title' => 'Apurar', 'department' => 'Fiscal',
+            'due_day' => 3, 'priority' => 'medium', 'order' => 1,
+            'default_assignee_member_id' => $outsider->getKey(),
+        ]);
+        $template->steps()->create([
+            'account_id' => $account->getKey(), 'title' => 'Transmitir', 'department' => 'Fiscal',
+            'due_day' => 5, 'priority' => 'medium', 'order' => 2,
+            'default_assignee_member_id' => $insider->getKey(),
+        ]);
+
+        Client::factory()->company()->create([
+            'account_id' => $account->getKey(), 'tax_regime' => TaxRegime::SimpleNational, 'status' => 'active',
+        ]);
+
+        $processes = app(ProcessGenerationService::class)->generate($template, Carbon::create(2026, 3, 1)->startOfDay());
+
+        $this->assertCount(1, $processes);
+        $tasks = $processes->first()->tasks()->ordered()->get();
+        $this->assertNull($tasks[0]->assignee_member_id);
+        $this->assertSame($insider->getKey(), $tasks[1]->assignee_member_id);
     }
 
     private function memberOf(Account $account, string $role): User

@@ -39,6 +39,20 @@ class AccountMemberReadTest extends TestCase
             ->assertOk();
     }
 
+    public function test_index_show_and_directory_share_read_ability(): void
+    {
+        $account = Account::factory()->create();
+        $operador = $this->memberOf($account, 'operador');
+        $user = $this->memberOf($account, 'user');
+
+        foreach ([$operador, $user] as $member) {
+            $this->actingAs($member, 'sanctum');
+            $this->getJson('/api/account/members')->assertOk();
+            $this->getJson("/api/account/members/{$user->getKey()}")->assertOk();
+            $this->getJson('/api/account/members/directory')->assertOk();
+        }
+    }
+
     public function test_show_cross_account_returns_404(): void
     {
         $account = Account::factory()->create();

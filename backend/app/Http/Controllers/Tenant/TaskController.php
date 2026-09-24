@@ -6,6 +6,7 @@ use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\UpdateTaskRequest;
 use App\Http\Resources\TaskResource;
+use App\Models\Department;
 use App\Models\Process;
 use App\Models\Task;
 use App\Services\SupportAudit;
@@ -33,13 +34,15 @@ class TaskController extends Controller
             'due_to' => ['sometimes', 'date'],
         ]);
 
+        $this->ensureDepartmentExists($filters['department'] ?? null);
+
         $tasks = Task::query()
             ->with(['process.client'])
             ->when(isset($filters['process_id']), fn (Builder $query) => $query->where('process_id', $filters['process_id']))
             ->when(isset($filters['client_id']), fn (Builder $query) => $query->whereHas('process', fn (Builder $processes) => $processes->where('client_id', $filters['client_id'])))
             ->when(isset($filters['status']), fn (Builder $query) => $query->where('status', $filters['status']))
             ->when(isset($filters['assignee_member_id']), fn (Builder $query) => $query->where('assignee_member_id', $filters['assignee_member_id']))
-            ->when(isset($filters['department']), fn (Builder $query) => $query->where('department', $filters['department']))
+            ->when(isset($filters['department']), fn (Builder $query) => $query->whereRaw('LOWER(department) = ?', [mb_strtolower(trim((string) $filters['department']))]))
             ->when(isset($filters['priority']), fn (Builder $query) => $query->where('priority', $filters['priority']))
             ->when(isset($filters['due_from']) || isset($filters['due_to']), fn (Builder $query) => $query
                 ->when(isset($filters['due_from']), fn (Builder $dates) => $dates->whereDate('due_on', '>=', $filters['due_from']))
@@ -124,6 +127,8 @@ class TaskController extends Controller
             'priority' => ['sometimes', 'string'],
         ]);
 
+        $this->ensureDepartmentExists($filters['department'] ?? null);
+
         return TaskResource::collection($this->filteredQuery($filters)->get());
     }
 
@@ -189,7 +194,7 @@ class TaskController extends Controller
             ->when(isset($filters['client_id']), fn (Builder $query) => $query->whereHas('process', fn (Builder $processes) => $processes->where('client_id', $filters['client_id'])))
             ->when(isset($filters['status']), fn (Builder $query) => $query->where('status', $filters['status']))
             ->when(isset($filters['assignee_member_id']), fn (Builder $query) => $query->where('assignee_member_id', $filters['assignee_member_id']))
-            ->when(isset($filters['department']), fn (Builder $query) => $query->where('department', $filters['department']))
+            ->when(isset($filters['department']), fn (Builder $query) => $query->whereRaw('LOWER(department) = ?', [mb_strtolower(trim((string) $filters['department']))]))
             ->when(isset($filters['priority']), fn (Builder $query) => $query->where('priority', $filters['priority']))
             ->ordered();
     }
@@ -197,5 +202,23 @@ class TaskController extends Controller
     private function taskStatus(Task $task): string
     {
         return $task->status instanceof TaskStatus ? $task->status->value : (string) $task->status;
+    }
+
+    private function ensureDepartmentExists(?string $department): void
+    {
+        if ($department === null || trim($department) === '') {
+            return;
+        }
+
+        $exists = Department::query()
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($department))])
+            ->exists();
+
+        if (! $exists) {
+            abort(response()->json([
+                'message' => 'O departamento informado não está cadastrado nesta conta.',
+                'errors' => ['department' => ['O departamento informado não está cadastrado nesta conta.']],
+            ], 422));
+        }
     }
 }
