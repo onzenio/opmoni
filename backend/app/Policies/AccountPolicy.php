@@ -54,15 +54,6 @@ class AccountPolicy
         return $this->tenantId() === $account->getKey() && $this->tenantRole($user) === 'admin';
     }
 
-    /**
-     * Reading the member directory is allowed for any tenant member
-     * (super_admin in support acts as admin). No email is exposed.
-     */
-    public function viewMembers(User $user, Account $account): bool
-    {
-        return $this->tenantId() === $account->getKey() && $this->tenantRole($user) !== null;
-    }
-
     private function tenantId(): ?int
     {
         return resolve(CurrentTenant::class)->accountId;
