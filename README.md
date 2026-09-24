@@ -35,8 +35,8 @@ cd frontend && corepack enable && pnpm install && pnpm dev  # :3000
 
 ## Env
 
-- `backend/.env.example` usa `pgsql` + `redis` (postgres do docker-compose). Testes usam sqlite `:memory:` (só para testar).
-- `docker-compose.yml` fornece os serviços (`pgsql` + `redis` + `nats`) com os mesmos valores do `.env` local. Não copie segredos de prod para o `.env` local.
+- `backend/.env.example` padrão é `sqlite`/`database`; `docker-compose.yml` sobrescreve para `pgsql` + `redis` + `nats`. Não copie valores do compose para o `.env` local fora do docker. Testes usam sqlite `:memory:` (só para testar).
+- `docker-compose.yml` fornece os serviços (`pgsql` + `redis` + `nats`). Não copie segredos de prod para o `.env` local.
 
 ## Comandos
 
