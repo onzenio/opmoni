@@ -1,4 +1,4 @@
-import type { WorkGroupedClient, WorkProcess, WorkTask, WorkTemplate } from '~/types/work'
+import type { WorkGeneratedProcess, WorkGroupedClient, WorkPreviewRow, WorkProcess, WorkTask, WorkTemplate, WorkTemplatePayload } from '~/types/work'
 
 export function useWork() {
   const { $api } = useNuxtApp()
@@ -13,11 +13,23 @@ export function useWork() {
     return res.data
   }
   async function previewTemplate(id: number) {
-    const res = await $api<{ data: { client: { id: number, name: string }, reason: string }[] }>(`/process-templates/${id}/preview`)
+    const res = await $api<{ data: WorkPreviewRow[] }>(`/process-templates/${id}/preview`)
     return res.data
   }
   async function generateTemplate(id: number, referenceMonth: string) {
-    const res = await $api<{ data: WorkProcess[] }>(`/process-templates/${id}/generate`, { method: 'POST', body: { reference_month: referenceMonth } })
+    const res = await $api<{ data: WorkGeneratedProcess[] }>(`/process-templates/${id}/generate`, { method: 'POST', body: { reference_month: referenceMonth } })
+    return res.data
+  }
+  async function showTemplate(id: number) {
+    const res = await $api<{ data: WorkTemplate }>(`/process-templates/${id}`)
+    return res.data
+  }
+  async function createTemplate(body: WorkTemplatePayload) {
+    const res = await $api<{ data: WorkTemplate }>('/process-templates', { method: 'POST', body })
+    return res.data
+  }
+  async function updateTemplate(id: number, body: WorkTemplatePayload) {
+    const res = await $api<{ data: WorkTemplate }>(`/process-templates/${id}`, { method: 'PATCH', body })
     return res.data
   }
   async function listProcesses(params: { template_id?: number, reference_month?: string, client_id?: number, status?: string } = {}) {
@@ -53,5 +65,5 @@ export function useWork() {
     const res = await $api<{ data: WorkGroupedClient[] }>('/work/grouped', { query: { reference_month: referenceMonth } })
     return res.data
   }
-  return { listTemplates, previewTemplate, generateTemplate, listProcesses, showProcess, listTasks, updateTask, calendar, grouped }
+  return { listTemplates, showTemplate, createTemplate, updateTemplate, previewTemplate, generateTemplate, listProcesses, showProcess, listTasks, updateTask, calendar, grouped }
 }
