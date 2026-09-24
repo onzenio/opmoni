@@ -58,14 +58,13 @@ const { data, status, error, refresh } = await useAsyncData<WorkTask[]>(
 const tasks = computed<WorkTask[]>(() => data.value ?? [])
 const isLoading = computed(() => status.value === 'pending')
 
-const { data: members, error: membersError, refresh: refreshMembersData } = await useAsyncData(
+const { data: members, error: membersError } = await useAsyncData(
   'work-members',
   async () => {
-    if (!canManageClients.value) return [] as { id: number, name: string }[]
-    const res = await $api<{ data?: { id: number, name: string }[] } | { id: number, name: string }[]>('/account/members')
+    const res = await $api<{ data?: { id: number, name: string }[] } | { id: number, name: string }[]>('/account/members/directory')
     return Array.isArray(res) ? res : (res.data ?? [])
   },
-  { default: () => [] as { id: number, name: string }[], watch: [canManageClients] }
+  { default: () => [] as { id: number, name: string }[] }
 )
 
 const membersFailed = computed(() => membersError.value !== null && membersError.value !== undefined)
@@ -74,7 +73,7 @@ const membersForbidden = computed(() => apiStatus(membersError.value) === 403)
 const membersHint = computed(() => {
   if (!membersFailed.value) return undefined
   return membersForbidden.value
-    ? 'Lista de membros indisponível para sua função.'
+    ? 'Lista de responsáveis indisponível no momento.'
     : 'Não foi possível carregar os responsáveis.'
 })
 
@@ -293,12 +292,8 @@ watch(error, (value) => {
 })
 
 watch(membersError, (value) => {
-  if (value && canManageClients.value) toast.add(membersWarning())
+  if (value) toast.add(membersWarning())
 }, { immediate: true })
-
-watch(canManageClients, (value) => {
-  if (value) void refreshMembersData()
-})
 
 watch(dismissOpen, (open) => {
   if (!open) {

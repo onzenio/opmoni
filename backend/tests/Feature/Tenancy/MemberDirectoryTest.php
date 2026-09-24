@@ -34,6 +34,21 @@ class MemberDirectoryTest extends TestCase
         }
     }
 
+    public function test_user_reads_directory_shape_used_by_work_assignment(): void
+    {
+        $account = Account::factory()->create();
+        $this->memberOf($account, 'operador', ['name' => 'Beto', 'email' => 'beto@opmoni.dev']);
+        $user = $this->memberOf($account, 'user', ['name' => 'Ana', 'email' => 'ana@opmoni.dev']);
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/account/members/directory');
+
+        $response->assertOk();
+        $response->assertJsonStructure(['data' => [['id', 'name', 'role', 'departments']]]);
+        $response->assertJsonPath('data.0.name', 'Ana');
+        $response->assertJsonMissing(['email' => 'ana@opmoni.dev']);
+        $response->assertJsonMissing(['email' => 'beto@opmoni.dev']);
+    }
+
     public function test_directory_never_leaks_other_account(): void
     {
         $accountA = Account::factory()->create();

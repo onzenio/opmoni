@@ -133,8 +133,7 @@ const { data: tagCatalog } = await useAsyncData<ClientTag[]>(
 const { data: members } = await useAsyncData(
   'work-model-members',
   async () => {
-    if (!canManageClients.value) return [] as { id: number, name: string }[]
-    const res = await $api<{ data?: { id: number, name: string }[] } | { id: number, name: string }[]>('/account/members')
+    const res = await $api<{ data?: { id: number, name: string }[] } | { id: number, name: string }[]>('/account/members/directory')
     return Array.isArray(res) ? res : (res.data ?? [])
   },
   { default: () => [] as { id: number, name: string }[] }
