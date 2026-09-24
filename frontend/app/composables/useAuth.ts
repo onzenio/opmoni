@@ -38,7 +38,10 @@ export function useAuth() {
   const accounts = useState<AuthAccountLink[]>('auth.accounts', () => [])
   const currentAccount = useState<AuthCurrentAccount | null>('auth.current-account', () => null)
   const currentRole = computed(() => accounts.value.find(account => account.id === currentAccount.value?.id)?.role ?? null)
-  const canManageClients = computed(() => isSuperAdmin.value || currentRole.value === 'admin' || currentRole.value === 'operador')
+  const can = (roles: string[]): boolean => isSuperAdmin.value || roles.includes(currentRole.value ?? '')
+  const canManageClients = computed(() => can(['admin', 'operador']))
+  const canManageWork = computed(() => can(['admin', 'operador']))
+  const canManageDepartments = computed(() => can(['admin', 'operador']))
 
   function applyMe(me: MeResponse) {
     user.value = { id: me.id, name: me.name, email: me.email }
@@ -104,5 +107,5 @@ export function useAuth() {
     return fetchMe()
   }
 
-  return { user, isSuperAdmin, accounts, currentAccount, currentRole, canManageClients, fetchMe, login, register, logout, switchAccount, enterSupport, exitSupport }
+  return { user, isSuperAdmin, accounts, currentAccount, currentRole, can, canManageClients, canManageWork, canManageDepartments, fetchMe, login, register, logout, switchAccount, enterSupport, exitSupport }
 }

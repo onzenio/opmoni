@@ -1,4 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+// Minimal ambient typing so `process.env` below typechecks without adding @types/node.
+declare const process: { env: Record<string, string | undefined> }
 export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
@@ -14,10 +16,10 @@ export default defineNuxtConfig({
 
   // NUXT_PUBLIC_API_URL sobrescreve este default automaticamente (runtime config).
   runtimeConfig: {
-    apiUrl: 'http://localhost:8000',
+    apiUrl: process.env.NUXT_API_URL ?? process.env.NUXT_PUBLIC_API_URL ?? 'http://localhost:8000',
     public: {
-      apiUrl: 'http://localhost:8000',
-      siteUrl: 'http://localhost:3000'
+      apiUrl: process.env.NUXT_PUBLIC_API_URL ?? 'http://localhost:8000',
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
     }
   },
 
