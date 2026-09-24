@@ -24,7 +24,7 @@ class ProcessTemplateController extends Controller
         Gate::authorize('viewAny', ProcessTemplate::class);
 
         return ProcessTemplateResource::collection(
-            ProcessTemplate::query()->with(['tags', 'steps'])->orderBy('name')->get()
+            ProcessTemplate::query()->with(['tags', 'exceptions', 'steps'])->orderBy('name')->get()
         );
     }
 

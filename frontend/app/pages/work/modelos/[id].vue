@@ -143,7 +143,7 @@ const { data: members } = await useAsyncData(
 const memberOptions = computed(() => (members.value ?? []).map(member => ({ label: member.name, value: member.id })))
 
 const previewKey = computed(() => (isNew.value ? 'new' : String(templateId.value)))
-const previewEnabled = computed(() => !isNew.value && canManageClients.value)
+const previewEnabled = computed(() => !isNew.value)
 
 const { data: previewData, status: previewStatus, error: previewError, refresh: refreshPreview } = await useAsyncData<WorkPreviewRow[]>(
   'work-model-preview',
@@ -238,6 +238,10 @@ function apiMessage(error: unknown): string | undefined {
 }
 
 function buildPayload(): WorkTemplatePayload {
+  const droppedSteps = form.steps.filter(step => step.title.trim().length === 0).length
+  if (droppedSteps > 0) {
+    toast.add({ title: droppedSteps === 1 ? '1 etapa sem título foi ignorada' : `${droppedSteps} etapas sem título foram ignoradas`, color: 'warning' })
+  }
   return {
     name: form.name.trim(),
     description: form.description.trim() || null,
@@ -284,7 +288,7 @@ async function onSave() {
   }
 }
 
-const canGenerate = computed(() => !isNew.value && /^\d{4}-\d{2}$/.test(referenceMonth.value))
+const canGenerate = computed(() => !isNew.value && /^\d{4}-(0[1-9]|1[0-2])$/.test(referenceMonth.value))
 
 async function onGenerate() {
   if (isNew.value || !canGenerate.value) return
@@ -670,7 +674,7 @@ async function onGenerate() {
                 <UInput
                   v-model="referenceMonth"
                   placeholder="2026-03"
-                  pattern="\\d{4}-\\d{2}"
+                  pattern="\d{4}-(0[1-9]|1[0-2])"
                   class="w-full"
                   :disabled="!canManageClients"
                 />

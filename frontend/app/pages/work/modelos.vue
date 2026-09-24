@@ -116,8 +116,8 @@ watch(error, (value) => {
           { accessorKey: 'regimes', header: 'Regimes' },
           { accessorKey: 'tags', header: 'Categorias/Tags' },
           { accessorKey: 'steps', header: 'Departamentos' },
-          { accessorKey: 'clients', header: 'Clientes' },
-          { accessorKey: 'recurrence', header: 'Recorrência' }
+          { id: 'clients', header: 'Clientes' },
+          { id: 'recurrence', header: 'Recorrência' }
         ]"
       >
         <template #name-cell="{ row }">
