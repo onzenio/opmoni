@@ -35,6 +35,7 @@ class UpdateTaskRequest extends FormRequest
             'status' => ['sometimes', 'required', 'string', Rule::in(TaskStatus::values())],
             'dismissal_reason' => ['nullable', 'string', 'max:2000', 'required_if:status,dismissed'],
             'assignee_member_id' => ['sometimes', 'nullable', 'integer', Rule::exists('users', 'id')],
+            'due_on' => ['sometimes', 'nullable', 'date'],
         ];
     }
 

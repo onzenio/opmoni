@@ -53,7 +53,12 @@ export function useWork() {
     const res = await $api<{ data: WorkTask[] }>('/tasks', { query: queryOf(params) })
     return res.data
   }
-  async function updateTask(id: number, body: { status?: string, dismissal_reason?: string, assignee_member_id?: number | null }) {
+  async function updateTask(id: number, body: {
+    status?: string
+    dismissal_reason?: string
+    assignee_member_id?: number | null
+    due_on?: string | null
+  }) {
     const res = await $api<{ data: WorkTask }>(`/tasks/${id}`, { method: 'PATCH', body })
     return res.data
   }
@@ -65,7 +70,9 @@ export function useWork() {
     department?: string
     priority?: string
   } = {}) {
-    const res = await $api<{ data: WorkTask[] }>('/work/calendar', { query: { from, to, ...queryOf(params) } })
+    const res = await $api<{ data: WorkTask[] }>('/work/calendar', {
+      query: queryOf({ from, to, ...params })
+    })
     return res.data
   }
   async function grouped(referenceMonth: string) {

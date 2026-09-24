@@ -103,6 +103,10 @@ class TaskController extends Controller
             $task->assignee_member_id = $data['assignee_member_id'];
         }
 
+        if (array_key_exists('due_on', $data)) {
+            $task->due_on = $data['due_on'];
+        }
+
         $task->save();
 
         SupportAudit::logWrite($request, 'tasks', 'update', $task->getKey(), ['status' => $to]);

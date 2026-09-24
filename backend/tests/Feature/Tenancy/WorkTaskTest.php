@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\Department;
 use App\Models\Process;
 use App\Models\ProcessTemplate;
+use App\Models\SupportAccessLog;
 use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\PlanSeeder;
@@ -367,6 +368,168 @@ class WorkTaskTest extends TestCase
         $this->patchJson("/api/tasks/{$task->getKey()}", ['assignee_member_id' => null])->assertOk();
     }
 
+    public function test_operador_can_reschedule_due_on_without_changing_status(): void
+    {
+        $account = Account::factory()->create();
+        $operador = $this->memberOf($account, 'operador');
+        $this->actingAs($operador, 'sanctum');
+
+        $process = Process::factory()->create(['account_id' => $account->getKey()]);
+        $task = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'status' => 'doing',
+            'due_on' => '2026-03-10',
+            'completed_at' => null,
+            'dismissal_reason' => null,
+        ]);
+
+        $this->patchJson("/api/tasks/{$task->getKey()}", ['due_on' => '2026-04-15'])
+            ->assertOk()
+            ->assertJsonPath('data.due_on', '2026-04-15')
+            ->assertJsonPath('data.status', 'doing')
+            ->assertJsonPath('data.completed_at', null)
+            ->assertJsonPath('data.dismissal_reason', null);
+
+        $this->assertSame('2026-04-15', $task->refresh()->due_on?->toDateString());
+        $this->assertSame('doing', $task->status->value);
+    }
+
+    public function test_clearing_due_on_removes_task_from_calendar_feed(): void
+    {
+        $account = Account::factory()->create();
+        $admin = $this->memberOf($account, 'admin');
+        $this->actingAs($admin, 'sanctum');
+
+        $process = Process::factory()->create(['account_id' => $account->getKey()]);
+        $task = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'title' => 'Com prazo',
+            'due_on' => '2026-03-10',
+        ]);
+
+        $this->patchJson("/api/tasks/{$task->getKey()}", ['due_on' => null])
+            ->assertOk()
+            ->assertJsonPath('data.due_on', null);
+
+        $this->assertNull($task->refresh()->due_on);
+
+        $this->getJson('/api/work/calendar?from=2026-03-01&to=2026-03-31')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_user_cannot_reschedule_due_on(): void
+    {
+        $account = Account::factory()->create();
+        $user = $this->memberOf($account, 'user');
+        $this->actingAs($user, 'sanctum');
+
+        $process = Process::factory()->create(['account_id' => $account->getKey()]);
+        $task = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'due_on' => '2026-03-10',
+        ]);
+
+        $this->patchJson("/api/tasks/{$task->getKey()}", ['due_on' => '2026-04-15'])
+            ->assertForbidden();
+
+        $this->assertSame('2026-03-10', $task->refresh()->due_on?->toDateString());
+    }
+
+    public function test_malformed_due_on_is_rejected(): void
+    {
+        $account = Account::factory()->create();
+        $admin = $this->memberOf($account, 'admin');
+        $this->actingAs($admin, 'sanctum');
+
+        $process = Process::factory()->create(['account_id' => $account->getKey()]);
+        $task = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'due_on' => '2026-03-10',
+        ]);
+
+        $this->patchJson("/api/tasks/{$task->getKey()}", ['due_on' => 'not-a-date'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['due_on']);
+
+        $this->assertSame('2026-03-10', $task->refresh()->due_on?->toDateString());
+    }
+
+    public function test_cascade_does_not_block_due_on_reschedule(): void
+    {
+        $account = Account::factory()->create();
+        $admin = $this->memberOf($account, 'admin');
+        $this->actingAs($admin, 'sanctum');
+
+        $template = ProcessTemplate::factory()->create([
+            'account_id' => $account->getKey(),
+            'cascade' => true,
+        ]);
+        $process = Process::factory()->create([
+            'account_id' => $account->getKey(),
+            'template_id' => $template->getKey(),
+        ]);
+        Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'order' => 1,
+            'title' => 'Etapa 1',
+            'status' => 'todo',
+        ]);
+        $task2 = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'order' => 2,
+            'title' => 'Etapa 2',
+            'status' => 'todo',
+            'due_on' => '2026-03-10',
+        ]);
+
+        $this->patchJson("/api/tasks/{$task2->getKey()}", ['due_on' => '2026-04-20'])
+            ->assertOk()
+            ->assertJsonPath('data.due_on', '2026-04-20')
+            ->assertJsonPath('data.status', 'todo');
+    }
+
+    public function test_support_mode_reschedule_is_audited(): void
+    {
+        $superAdmin = $this->superAdminWithOwnAccount();
+        $target = Account::factory()->create();
+
+        $this->actingAs($superAdmin, 'sanctum')
+            ->postJson("/api/support/accounts/{$target->getKey()}/enter")
+            ->assertOk();
+
+        $process = Process::factory()->create(['account_id' => $target->getKey()]);
+        $task = Task::factory()->create([
+            'account_id' => $target->getKey(),
+            'process_id' => $process->getKey(),
+            'due_on' => '2026-03-10',
+        ]);
+
+        $this->actingAs($superAdmin, 'sanctum')
+            ->patchJson("/api/tasks/{$task->getKey()}", ['due_on' => '2026-05-01'])
+            ->assertOk()
+            ->assertJsonPath('data.due_on', '2026-05-01');
+
+        $this->assertDatabaseHas('support_access_logs', [
+            'super_admin_user_id' => $superAdmin->getKey(),
+            'account_id' => $target->getKey(),
+            'action' => 'update',
+        ]);
+
+        $log = SupportAccessLog::firstWhere([
+            'action' => 'update',
+            'account_id' => $target->getKey(),
+        ]);
+        $this->assertSame('tasks', $log->metadata['resource']);
+        $this->assertSame($task->getKey(), $log->metadata['resource_id']);
+    }
+
     private function memberOf(Account $account, string $role): User
     {
         $user = User::factory()->create();
@@ -374,5 +537,22 @@ class WorkTaskTest extends TestCase
         $user->forceFill(['current_account_id' => $account->getKey()])->save();
 
         return $user->refresh();
+    }
+
+    private function superAdminWithOwnAccount(): User
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->forceFill(['is_super_admin' => true])->save();
+        $home = Account::factory()->create();
+
+        AccountUser::create([
+            'account_id' => $home->getKey(),
+            'user_id' => $superAdmin->getKey(),
+            'role' => 'admin',
+        ]);
+
+        $superAdmin->forceFill(['current_account_id' => $home->getKey()])->save();
+
+        return $superAdmin->refresh();
     }
 }
