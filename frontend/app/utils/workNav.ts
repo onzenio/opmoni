@@ -8,9 +8,9 @@ export interface WorkNavItem {
 
 export const workNav: readonly WorkNavItem[] = [
   { label: 'Calendário', icon: 'i-lucide-calendar-days', to: '/work/calendario' },
-  { label: 'Clientes', icon: 'i-lucide-users', to: '/work/clientes' },
+  { label: 'Clientes', icon: 'i-lucide-building', to: '/work/clientes' },
   { label: 'Processos', icon: 'i-lucide-layers', to: '/work/processos' },
-  { label: 'Tarefas', icon: 'i-lucide-kanban-square', to: '/work/tarefas' },
+  { label: 'Tarefas', icon: 'i-lucide-square-kanban', to: '/work/tarefas' },
   { label: 'Modelos', icon: 'i-lucide-shapes', to: '/work/modelos' }
 ]
 

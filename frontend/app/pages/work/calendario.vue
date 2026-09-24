@@ -6,6 +6,7 @@ import type { WorkTask } from '~/types/work'
 definePageMeta({ middleware: 'auth' })
 
 const { calendar } = useWork()
+const { $api } = useNuxtApp()
 const toast = useToast()
 
 function firstDayOfMonth(year: number, month: number): string {
@@ -24,16 +25,86 @@ const currentMonth = now.getMonth() + 1
 const from = ref(firstDayOfMonth(currentYear, currentMonth))
 const to = ref(lastDayOfMonth(currentYear, currentMonth))
 
-const rangeKey = computed(() => JSON.stringify([from.value, to.value]))
+const STATUS_ALL = 'all'
+const PRIORITY_ALL = 'all'
+
+interface CalendarFilters {
+  processId: string
+  clientId: string
+  assigneeId: string
+  department: string
+  priority: string
+  status: string
+}
+
+const ASSIGNEE_ALL = 'all'
+
+const filters = reactive<CalendarFilters>({
+  processId: '',
+  clientId: '',
+  assigneeId: ASSIGNEE_ALL,
+  department: '',
+  priority: PRIORITY_ALL,
+  status: STATUS_ALL
+})
+
+const STATUS_FILTER_ITEMS = [
+  { label: 'Todos', value: STATUS_ALL },
+  { label: 'A fazer', value: 'todo' },
+  { label: 'Em progresso', value: 'doing' },
+  { label: 'Concluída', value: 'done' },
+  { label: 'Dispensada', value: 'dismissed' }
+]
+
+const PRIORITY_FILTER_ITEMS = [
+  { label: 'Todas', value: PRIORITY_ALL },
+  { label: 'Baixa', value: 'low' },
+  { label: 'Média', value: 'medium' },
+  { label: 'Alta', value: 'high' },
+  { label: 'Urgente', value: 'urgent' }
+]
+
+const filterQuery = computed(() => ({
+  process_id: filters.processId ? Number(filters.processId) : undefined,
+  client_id: filters.clientId ? Number(filters.clientId) : undefined,
+  assignee_member_id: filters.assigneeId !== ASSIGNEE_ALL && filters.assigneeId ? Number(filters.assigneeId) : undefined,
+  department: filters.department || undefined,
+  priority: filters.priority !== PRIORITY_ALL ? filters.priority : undefined,
+  status: filters.status !== STATUS_ALL ? filters.status : undefined
+}))
+
+const rangeKey = computed(() => JSON.stringify([from.value, to.value, filterQuery.value]))
 
 const { data, status, error, refresh } = await useAsyncData(
   'work-calendar',
-  () => calendar(from.value, to.value),
+  () => calendar(from.value, to.value, filterQuery.value),
   { watch: [rangeKey] }
 )
 
 const tasks = computed<WorkTask[]>(() => data.value ?? [])
 const isLoading = computed(() => status.value === 'pending')
+
+const { data: members, error: membersError } = await useAsyncData(
+  'work-calendar-members',
+  async () => {
+    const res = await $api<{ data?: { id: number, name: string }[] } | { id: number, name: string }[]>('/account/members/directory')
+    return Array.isArray(res) ? res : (res.data ?? [])
+  },
+  { default: () => [] as { id: number, name: string }[] }
+)
+
+const memberOptions = computed(() => (members.value ?? []).map(member => ({ label: member.name, value: String(member.id) })))
+const assigneeFilterItems = computed(() => [{ label: 'Todos', value: ASSIGNEE_ALL }, ...memberOptions.value])
+const membersFailed = computed(() => membersError.value !== null && membersError.value !== undefined)
+
+function clearFilters() {
+  filters.processId = ''
+  filters.clientId = ''
+  filters.assigneeId = ASSIGNEE_ALL
+  filters.department = ''
+  filters.priority = PRIORITY_ALL
+  filters.status = STATUS_ALL
+}
 
 const byDay = computed(() => {
   const map = new Map<string, WorkTask[]>()
@@ -53,6 +124,27 @@ function statusPresentation(taskStatus: WorkTask['status']): { label: string, co
     case 'done': return { label: 'Concluída', color: 'success' }
     case 'dismissed': return { label: 'Dispensada', color: 'neutral' }
   }
+}
+
+function chipColor(taskStatus: WorkTask['status']): 'info' | 'warning' | 'success' | 'neutral' {
+  return statusPresentation(taskStatus).color
+}
+
+function dotClass(taskStatus: WorkTask['status']): string {
+  switch (taskStatus) {
+    case 'todo': return 'bg-info'
+    case 'doing': return 'bg-warning'
+    case 'done': return 'bg-success'
+    case 'dismissed': return 'bg-muted'
+  }
+}
+
+function dayTooltip(day: { year: number, month: number, day: number }): string {
+  const dayTasks = byDay.value.get(toKey(day)) ?? []
+  if (dayTasks.length === 0) return ''
+  const shown = dayTasks.slice(0, 4).map(task => `${statusPresentation(task.status).label}: ${task.title}`)
+  const overflow = dayTasks.length > 4 ? [`+${dayTasks.length - 4} tarefa(s)`] : []
+  return [...shown, ...overflow].join('\n')
 }
 
 function toKey(date: { year: number, month: number, day: number }): string {
@@ -154,6 +246,75 @@ const monthLabel = computed(() => {
       />
     </header>
 
+    <UCard variant="subtle" :ui="{ body: 'p-3 sm:p-4' }">
+      <div class="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <UFormField label="Processo (ID)" name="process_id">
+          <UInput
+            v-model="filters.processId"
+            type="number"
+            min="1"
+            placeholder="Todos"
+            class="w-full"
+          />
+        </UFormField>
+        <UFormField label="Cliente (ID)" name="client_id">
+          <UInput
+            v-model="filters.clientId"
+            type="number"
+            min="1"
+            placeholder="Todos"
+            class="w-full"
+          />
+        </UFormField>
+        <UFormField label="Departamento" name="department">
+          <UInput v-model="filters.department" placeholder="Ex.: Fiscal" class="w-full" />
+        </UFormField>
+        <UFormField label="Status" name="status">
+          <!--
+            value-key/label-key: o valor "all" (nunca string vazia) evita o crash
+            do reka-ui SelectItem, que rejeita value="".
+          -->
+          <USelect
+            v-model="filters.status"
+            :items="STATUS_FILTER_ITEMS"
+            value-key="value"
+            placeholder="Todos"
+            class="w-full"
+          />
+        </UFormField>
+        <UFormField label="Prioridade" name="priority">
+          <USelect
+            v-model="filters.priority"
+            :items="PRIORITY_FILTER_ITEMS"
+            value-key="value"
+            placeholder="Todas"
+            class="w-full"
+          />
+        </UFormField>
+        <UFormField label="Responsável" name="assignee" :hint="membersFailed ? 'Lista de responsáveis indisponível no momento.' : undefined">
+          <!-- "all" evita o crash do SelectItem com value "". -->
+          <USelectMenu
+            v-model="filters.assigneeId"
+            :items="assigneeFilterItems"
+            value-key="value"
+            label-key="label"
+            placeholder="Todos"
+            :search-input="{ placeholder: 'Buscar membro...' }"
+            class="w-full"
+          />
+        </UFormField>
+      </div>
+      <div class="mt-2 flex justify-end">
+        <UButton
+          label="Limpar filtros"
+          color="neutral"
+          variant="subtle"
+          icon="i-lucide-x"
+          @click="clearFilters"
+        />
+      </div>
+    </UCard>
+
     <UAlert
       v-if="error"
       color="error"
@@ -187,20 +348,33 @@ const monthLabel = computed(() => {
           @update:placeholder="onPlaceholderUpdate"
         >
           <template #day="{ day }">
-            <div class="flex min-h-7 flex-col items-center gap-0.5 px-0.5 py-0.5">
-              <span class="text-xs leading-none">{{ day.day }}</span>
-              <div class="flex flex-wrap items-center justify-center gap-0.5">
-                <span
-                  v-for="task in (byDay.get(toKey(day)) ?? []).slice(0, 4)"
-                  :key="task.id"
-                  :title="task.title"
-                  :class="[
-                    'size-1.5 rounded-full',
-                    task.status === 'todo' ? 'bg-info' : task.status === 'doing' ? 'bg-warning' : task.status === 'done' ? 'bg-success' : 'bg-muted'
-                  ]"
-                />
+            <UTooltip
+              :text="dayTooltip(day)"
+              :disabled="!(byDay.get(toKey(day)) ?? []).length"
+              :delay-duration="300"
+            >
+              <div class="flex min-h-7 cursor-pointer flex-col items-center gap-0.5 px-0.5 py-0.5">
+                <span class="text-xs leading-none">{{ day.day }}</span>
+                <div class="flex max-w-full flex-wrap items-center justify-center gap-0.5">
+                  <UChip
+                    v-for="task in (byDay.get(toKey(day)) ?? []).slice(0, 4)"
+                    :key="task.id"
+                    standalone
+                    :color="chipColor(task.status)"
+                    position="top-right"
+                    size="sm"
+                  >
+                    <span class="size-1.5 rounded-full" :class="dotClass(task.status)" />
+                  </UChip>
+                  <span
+                    v-if="(byDay.get(toKey(day)) ?? []).length > 4"
+                    class="text-[10px] leading-none text-muted"
+                  >
+                    +{{ (byDay.get(toKey(day)) ?? []).length - 4 }}
+                  </span>
+                </div>
               </div>
-            </div>
+            </UTooltip>
           </template>
         </UCalendar>
       </UCard>

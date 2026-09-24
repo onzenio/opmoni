@@ -6,7 +6,7 @@ definePageMeta({ middleware: 'auth' })
 const toast = useToast()
 const { $api } = useNuxtApp()
 const { listTasks, updateTask } = useWork()
-const { canManageClients } = useAuth()
+const { canManageWork } = useAuth()
 
 type ColumnKey = WorkTask['status']
 
@@ -20,29 +20,40 @@ interface TaskFilters {
   clientId: string
   assigneeId: string
   department: string
-  priority: string
+  priority: 'all' | 'low' | 'medium' | 'high' | 'urgent'
   dueFrom: string
   dueTo: string
 }
 
+const PRIORITY_ALL = 'all'
+const ASSIGNEE_ALL = 'all'
+
 const filters = reactive<TaskFilters>({
   processId: '',
   clientId: '',
-  assigneeId: '',
+  assigneeId: ASSIGNEE_ALL,
   department: '',
-  priority: '',
+  priority: PRIORITY_ALL,
   dueFrom: '',
   dueTo: ''
 })
 
 const viewMode = ref<'board' | 'table'>('board')
 
+const PRIORITY_FILTER_ITEMS = [
+  { label: 'Todas', value: PRIORITY_ALL },
+  { label: 'Baixa', value: 'low' },
+  { label: 'Média', value: 'medium' },
+  { label: 'Alta', value: 'high' },
+  { label: 'Urgente', value: 'urgent' }
+]
+
 const filterQuery = computed(() => ({
   process_id: filters.processId ? Number(filters.processId) : undefined,
   client_id: filters.clientId ? Number(filters.clientId) : undefined,
-  assignee_member_id: filters.assigneeId ? Number(filters.assigneeId) : undefined,
+  assignee_member_id: filters.assigneeId !== ASSIGNEE_ALL && filters.assigneeId ? Number(filters.assigneeId) : undefined,
   department: filters.department || undefined,
-  priority: filters.priority || undefined,
+  priority: filters.priority !== PRIORITY_ALL ? filters.priority : undefined,
   due_from: filters.dueFrom || undefined,
   due_to: filters.dueTo || undefined
 }))
@@ -95,7 +106,7 @@ const assigneeItems = computed(() => [
 ])
 
 const assigneeFilterItems = computed(() => [
-  { label: 'Todos', value: '' },
+  { label: 'Todos', value: ASSIGNEE_ALL },
   ...memberOptions.value.map(option => ({ label: option.label, value: String(option.value) }))
 ])
 
@@ -272,9 +283,9 @@ function filteredBy(status: ColumnKey): WorkTask[] {
 function clearFilters() {
   filters.processId = ''
   filters.clientId = ''
-  filters.assigneeId = ''
+  filters.assigneeId = ASSIGNEE_ALL
   filters.department = ''
-  filters.priority = ''
+  filters.priority = PRIORITY_ALL
   filters.dueFrom = ''
   filters.dueTo = ''
 }
@@ -364,15 +375,11 @@ watch(dismissOpen, (open) => {
           <UInput v-model="filters.department" placeholder="Ex.: Fiscal" class="w-full" />
         </UFormField>
         <UFormField label="Prioridade" name="priority">
+          <!-- value-key resolve o label; "all" evita o crash do SelectItem com value "". -->
           <USelect
             v-model="filters.priority"
-            :items="[
-              { label: 'Todas', value: '' },
-              { label: 'Baixa', value: 'low' },
-              { label: 'Média', value: 'medium' },
-              { label: 'Alta', value: 'high' },
-              { label: 'Urgente', value: 'urgent' }
-            ]"
+            :items="PRIORITY_FILTER_ITEMS"
+            value-key="value"
             placeholder="Todas"
             class="w-full"
           />
@@ -384,14 +391,16 @@ watch(dismissOpen, (open) => {
           <UInput v-model="filters.dueTo" type="date" class="w-full" />
         </UFormField>
         <UFormField
-          v-if="canManageClients"
+          v-if="canManageWork"
           label="Responsável"
           name="assignee"
           :hint="membersHint"
         >
+          <!-- "all" evita o crash do SelectItem com value "". -->
           <USelect
             v-model="filters.assigneeId"
             :items="assigneeFilterItems"
+            value-key="value"
             placeholder="Todos"
             class="w-full"
           />
@@ -528,7 +537,7 @@ watch(dismissOpen, (open) => {
           </p>
 
           <USelectMenu
-            v-if="canManageClients"
+            v-if="canManageWork"
             :model-value="task.assignee_member_id"
             :items="assigneeItems"
             value-key="value"
@@ -540,11 +549,11 @@ watch(dismissOpen, (open) => {
             class="w-full"
             @update:model-value="(value: number | null) => assign(task, value)"
           />
-          <p v-if="canManageClients && membersFailed" class="text-xs text-muted">
+          <p v-if="canManageWork && membersFailed" class="text-xs text-muted">
             {{ membersHint }}
           </p>
 
-          <div v-if="canManageClients" class="flex flex-wrap gap-1.5">
+          <div v-if="canManageWork" class="flex flex-wrap gap-1.5">
             <UButton
               v-if="task.status === 'todo' || task.status === 'doing'"
               :label="task.status === 'todo' ? 'Avançar' : 'Concluir'"

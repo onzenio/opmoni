@@ -128,10 +128,14 @@ class ClientPortfolio
      */
     private function groupCounts(Builder $base, string $column, ?int $limit = null): array
     {
+        $grammar = $base->getQuery()->getGrammar();
+        $key = $grammar->wrap('key');
+        $count = $grammar->wrap('count');
+
         $query = (clone $base)
             ->whereNotNull($column)
             ->where($column, '!=', '')
-            ->selectRaw("{$column} as `key`, count(*) as `count`")
+            ->selectRaw("{$grammar->wrap($column)} as {$key}, count(*) as {$count}")
             ->groupBy($column)
             ->orderByDesc('count')
             ->orderBy('key');
@@ -183,10 +187,15 @@ class ClientPortfolio
      */
     private function activityCounts(Builder $base, int $limit): array
     {
+        $grammar = $base->getQuery()->getGrammar();
+        $key = $grammar->wrap('key');
+        $label = $grammar->wrap('label');
+        $count = $grammar->wrap('count');
+
         return (clone $base)
             ->whereNotNull('primary_activity_code')
             ->where('primary_activity_code', '!=', '')
-            ->selectRaw('primary_activity_code as `key`, max(primary_activity_description) as `label`, count(*) as `count`')
+            ->selectRaw("primary_activity_code as {$key}, max(primary_activity_description) as {$label}, count(*) as {$count}")
             ->groupBy('primary_activity_code')
             ->orderByDesc('count')
             ->orderBy('key')
@@ -209,6 +218,9 @@ class ClientPortfolio
         $end = now()->startOfMonth();
         $start = $end->copy()->subMonths(11);
         $driver = $base->getConnection()->getDriverName();
+        $grammar = $base->getQuery()->getGrammar();
+        $key = $grammar->wrap('key');
+        $count = $grammar->wrap('count');
         $expression = match ($driver) {
             'pgsql' => "to_char(created_at, 'YYYY-MM')",
             'mysql' => "date_format(created_at, '%Y-%m')",
@@ -217,7 +229,7 @@ class ClientPortfolio
 
         $counts = (clone $base)
             ->where('created_at', '>=', $start)
-            ->selectRaw("{$expression} as `key`, count(*) as `count`")
+            ->selectRaw("{$expression} as {$key}, count(*) as {$count}")
             ->groupBy('key')
             ->pluck('count', 'key');
 

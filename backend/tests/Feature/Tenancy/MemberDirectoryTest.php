@@ -108,6 +108,23 @@ class MemberDirectoryTest extends TestCase
         $response->assertJsonMissing(['name' => 'Forasteiro']);
     }
 
+    public function test_admin_lists_directory_without_email(): void
+    {
+        $account = Account::factory()->create();
+        $admin = $this->memberOf($account, 'admin', ['name' => 'Chefe', 'email' => 'chefe@opmoni.dev']);
+        $this->memberOf($account, 'user', ['name' => 'Ana', 'email' => 'ana@opmoni.dev']);
+
+        $response = $this->actingAs($admin, 'sanctum')->getJson('/api/account/members/directory');
+
+        $response->assertOk();
+        $response->assertJsonStructure(['data' => [['id', 'name', 'role', 'departments']]]);
+        $response->assertJsonCount(2, 'data');
+        $response->assertJsonPath('data.0.name', 'Ana');
+        $response->assertJsonPath('data.1.name', 'Chefe');
+        $response->assertJsonMissing(['email' => 'ana@opmoni.dev']);
+        $response->assertJsonMissing(['email' => 'chefe@opmoni.dev']);
+    }
+
     public function test_operador_still_cannot_invite_members(): void
     {
         $account = Account::factory()->create();

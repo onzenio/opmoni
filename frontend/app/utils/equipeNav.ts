@@ -8,7 +8,7 @@ export interface EquipePage {
 
 export const equipePages: readonly EquipePage[] = [
   { label: 'Membros', icon: 'i-lucide-users', to: '/equipe' },
-  { label: 'Departamentos', icon: 'i-lucide-building-2', to: '/equipe/departamentos' }
+  { label: 'Departamentos', icon: 'i-lucide-network', to: '/equipe/departamentos' }
 ]
 
 export function equipePageActive(path: string, page: EquipePage) {

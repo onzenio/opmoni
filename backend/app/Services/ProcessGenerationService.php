@@ -22,6 +22,19 @@ class ProcessGenerationService
     {
         $reference = $month->copy()->startOfMonth()->startOfDay();
         $referenceDate = $reference->toDateString();
+
+        // Congelamento: se o mês já foi gerado, a elegibilidade atual não
+        // reavalia nem recria nada (regime/tag/blueprint mudam só os
+        // próximos meses); retorna os processos congelados do mês.
+        $frozen = Process::withoutGlobalScope('account')->where([
+            'account_id' => $template->account_id,
+            'template_id' => $template->getKey(),
+        ])->whereDate('reference_month', $referenceDate)->orderBy('id')->get();
+
+        if ($frozen->isNotEmpty()) {
+            return $frozen;
+        }
+
         $clients = $this->eligibleClients($template);
 
         return $clients->map(fn (Client $client): Process => DB::transaction(function () use ($template, $client, $reference, $referenceDate): Process {

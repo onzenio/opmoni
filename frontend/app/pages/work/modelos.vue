@@ -6,7 +6,7 @@ import type { TaxRegime } from '~/types/client'
 definePageMeta({ middleware: 'auth' })
 
 const toast = useToast()
-const { canManageClients } = useAuth()
+const { canManageWork } = useAuth()
 const { listTemplates } = useWork()
 
 const { data, status, error, refresh } = await useAsyncData<WorkTemplate[]>(
@@ -68,7 +68,7 @@ watch(error, (value) => {
         </h2>
       </div>
       <UButton
-        v-if="canManageClients"
+        v-if="canManageWork"
         label="Novo modelo"
         icon="i-lucide-plus"
         color="primary"
@@ -105,7 +105,7 @@ watch(error, (value) => {
       title="Nenhum modelo cadastrado"
       description="Os modelos definem as rotinas mensais que geram um processo por cliente."
       variant="naked"
-      :actions="canManageClients ? [{ label: 'Criar modelo', icon: 'i-lucide-plus', to: '/work/modelos/novo' }] : [{ label: 'Atualizar', icon: 'i-lucide-refresh-cw', onClick: () => onRefresh() }]"
+      :actions="canManageWork ? [{ label: 'Criar modelo', icon: 'i-lucide-plus', to: '/work/modelos/novo' }] : [{ label: 'Atualizar', icon: 'i-lucide-refresh-cw', onClick: () => onRefresh() }]"
     />
 
     <UCard v-else variant="subtle" :ui="{ body: 'p-0 sm:p-0' }">

@@ -55,4 +55,37 @@ class Task extends Model
             ->when($from, fn (Builder $dates): Builder => $dates->whereDate('due_on', '>=', $from))
             ->when($to, fn (Builder $dates): Builder => $dates->whereDate('due_on', '<=', $to));
     }
+
+    public function scopeOfProcess(Builder $query, ?int $processId): Builder
+    {
+        return $processId === null ? $query : $query->where('process_id', $processId);
+    }
+
+    public function scopeOfClient(Builder $query, ?int $clientId): Builder
+    {
+        return $clientId === null
+            ? $query
+            : $query->whereHas('process', fn (Builder $processes): Builder => $processes->where('client_id', $clientId));
+    }
+
+    public function scopeOfAssignee(Builder $query, ?int $assigneeMemberId): Builder
+    {
+        return $assigneeMemberId === null ? $query : $query->where('assignee_member_id', $assigneeMemberId);
+    }
+
+    public function scopeOfDepartment(Builder $query, ?string $department): Builder
+    {
+        if ($department === null || trim($department) === '') {
+            return $query;
+        }
+
+        return $query->whereRaw('LOWER(department) = ?', [mb_strtolower(trim($department))]);
+    }
+
+    public function scopeOfPriority(Builder $query, string|array|null $priority): Builder
+    {
+        $values = is_array($priority) ? $priority : ($priority ? [$priority] : []);
+
+        return $values === [] ? $query : $query->whereIn('priority', $values);
+    }
 }

@@ -17,7 +17,9 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    // Banco principal: postgres do docker-compose.yml (opmoni/opmoni).
+    // sqlite existe só para testes (phpunit.xml força :memory:).
+    'default' => env('DB_CONNECTION', 'pgsql'),
 
     /*
     |--------------------------------------------------------------------------

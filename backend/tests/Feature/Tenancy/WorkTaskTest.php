@@ -132,7 +132,123 @@ class WorkTaskTest extends TestCase
         $this->getJson('/api/work/grouped?reference_month=2026-03')
             ->assertOk()
             ->assertJsonPath('data.0.client.id', $client->getKey())
-            ->assertJsonPath('data.0.processes.0.tasks.0.title', 'Com data');
+            ->assertJsonPath('data.0.processes.0.tasks.0.title', 'Com data')
+            ->assertJsonPath('data.0.processes.0.totals.tasks', 2)
+            ->assertJsonPath('data.0.processes.0.totals.done', 0)
+            ->assertJsonPath('data.0.processes.0.totals.dismissed', 0)
+            ->assertJsonPath('data.0.processes.0.totals.open', 2)
+            ->assertJsonPath('data.0.processes.0.progress.total', 2)
+            ->assertJsonPath('data.0.processes.0.progress.done', 0)
+            ->assertJsonPath('data.0.processes.0.progress.dismissed', 0)
+            ->assertJsonPath('data.0.processes.0.progress.open', 2)
+            ->assertJsonPath('data.0.processes.0.ratio', 0);
+    }
+
+    public function test_grouped_totals_align_with_process_progress(): void
+    {
+        $account = Account::factory()->create();
+        $member = $this->memberOf($account, 'admin');
+        $this->actingAs($member, 'sanctum');
+
+        $client = Client::factory()->company()->create([
+            'account_id' => $account->getKey(),
+            'status' => 'active',
+        ]);
+        $process = Process::factory()->create([
+            'account_id' => $account->getKey(),
+            'name' => 'Março',
+            'client_id' => $client->getKey(),
+            'reference_month' => '2026-03-01',
+            'status' => 'open',
+        ]);
+        Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'title' => 'Feita',
+            'status' => 'done',
+            'due_on' => '2026-03-05',
+            'order' => 1,
+        ]);
+        Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'title' => 'Dispensada',
+            'status' => 'dismissed',
+            'dismissal_reason' => 'Sem movimento',
+            'due_on' => '2026-03-06',
+            'order' => 2,
+        ]);
+        Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'title' => 'Aberta',
+            'status' => 'todo',
+            'due_on' => '2026-03-07',
+            'order' => 3,
+        ]);
+        Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'title' => 'Fazendo',
+            'status' => 'doing',
+            'due_on' => '2026-03-08',
+            'order' => 4,
+        ]);
+
+        $this->getJson("/api/processes/{$process->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('data.progress.total', 4)
+            ->assertJsonPath('data.progress.done', 1)
+            ->assertJsonPath('data.progress.dismissed', 1)
+            ->assertJsonPath('data.progress.open', 2)
+            ->assertJsonPath('data.progress.ratio', 0.25);
+
+        $this->getJson('/api/work/grouped?reference_month=2026-03')
+            ->assertOk()
+            ->assertJsonPath('data.0.processes.0.totals.tasks', 4)
+            ->assertJsonPath('data.0.processes.0.totals.done', 1)
+            ->assertJsonPath('data.0.processes.0.totals.dismissed', 1)
+            ->assertJsonPath('data.0.processes.0.totals.open', 2)
+            ->assertJsonPath('data.0.processes.0.progress.total', 4)
+            ->assertJsonPath('data.0.processes.0.progress.done', 1)
+            ->assertJsonPath('data.0.processes.0.progress.dismissed', 1)
+            ->assertJsonPath('data.0.processes.0.progress.open', 2)
+            ->assertJsonPath('data.0.processes.0.progress.ratio', 0.25)
+            ->assertJsonPath('data.0.processes.0.ratio', 0.25);
+    }
+
+    public function test_task_full_lifecycle_concludes_reopens_and_clears_stamp(): void
+    {
+        $account = Account::factory()->create();
+        $admin = $this->memberOf($account, 'admin');
+        $this->actingAs($admin, 'sanctum');
+
+        $process = Process::factory()->create([
+            'account_id' => $account->getKey(),
+            'name' => 'Avulso',
+        ]);
+        $task = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'title' => 'Etapa única',
+        ]);
+
+        $this->patchJson("/api/tasks/{$task->getKey()}", ['status' => 'doing'])->assertOk();
+
+        $done = $this->patchJson("/api/tasks/{$task->getKey()}", ['status' => 'done'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'done')
+            ->json('data');
+
+        $this->assertNotNull($done['completed_at']);
+
+        $reopened = $this->patchJson("/api/tasks/{$task->getKey()}", ['status' => 'doing'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'doing')
+            ->json('data');
+
+        $this->assertNull($reopened['completed_at']);
+        $this->assertNull($reopened['dismissal_reason']);
     }
 
     public function test_reassign_without_status_change_skips_reason_and_cascade_guards(): void

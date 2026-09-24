@@ -9,7 +9,7 @@ definePageMeta({ middleware: 'auth' })
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const { canManageClients } = useAuth()
+const { canManageWork } = useAuth()
 const { $api } = useNuxtApp()
 const { listTemplates, showTemplate, createTemplate, updateTemplate, previewTemplate, generateTemplate } = useWork()
 
@@ -102,7 +102,7 @@ async function load() {
   loading.value = true
   loadError.value = false
   try {
-    if (!canManageClients.value) {
+    if (!canManageWork.value) {
       const found = (await listTemplates()).find(template => template.id === templateId.value)
       if (found) syncFromTemplate(found)
       else throw new Error('not-found')
@@ -320,7 +320,7 @@ async function onGenerate() {
         </h2>
       </div>
       <UButton
-        v-if="canManageClients"
+        v-if="canManageWork"
         label="Salvar"
         icon="i-lucide-check"
         color="primary"
@@ -347,7 +347,7 @@ async function onGenerate() {
     </div>
 
     <template v-else>
-      <div v-if="!canManageClients" class="flex">
+      <div v-if="!canManageWork" class="flex">
         <UAlert
           color="warning"
           variant="subtle"
@@ -364,7 +364,7 @@ async function onGenerate() {
               v-model="form.name"
               placeholder="Ex.: PGDAS"
               class="w-full"
-              :disabled="!canManageClients"
+              :disabled="!canManageWork"
             />
           </UFormField>
           <UFormField label="Descrição" name="description">
@@ -372,7 +372,7 @@ async function onGenerate() {
               v-model="form.description"
               placeholder="Opcional"
               class="w-full"
-              :disabled="!canManageClients"
+              :disabled="!canManageWork"
             />
           </UFormField>
         </div>
@@ -398,7 +398,7 @@ async function onGenerate() {
                 multiple
                 placeholder="Todos os regimes"
                 class="w-full"
-                :disabled="!canManageClients"
+                :disabled="!canManageWork"
               />
             </UFormField>
             <UFormField label="Tags (categorias)" name="tag_ids" help="Cliente precisa ter ao menos uma das tags.">
@@ -410,14 +410,14 @@ async function onGenerate() {
                 multiple
                 placeholder="Nenhuma tag"
                 class="w-full"
-                :disabled="!canManageClients"
+                :disabled="!canManageWork"
               />
             </UFormField>
             <UFormField label="Cascata" name="cascade" help="Etapas só avançam após concluir as anteriores.">
-              <USwitch v-model="form.cascade" :disabled="!canManageClients" />
+              <USwitch v-model="form.cascade" :disabled="!canManageWork" />
             </UFormField>
             <UFormField label="Modelo ativo" name="is_active">
-              <USwitch v-model="form.is_active" :disabled="!canManageClients" />
+              <USwitch v-model="form.is_active" :disabled="!canManageWork" />
             </UFormField>
           </div>
         </UCard>
@@ -470,7 +470,7 @@ async function onGenerate() {
               </ul>
             </template>
 
-            <div v-if="canManageClients" class="grid min-w-0 gap-2 sm:grid-cols-2">
+            <div v-if="canManageWork" class="grid min-w-0 gap-2 sm:grid-cols-2">
               <UFormField label="Incluir cliente (ID)" name="added">
                 <div class="flex gap-1.5">
                   <UInput
@@ -514,7 +514,7 @@ async function onGenerate() {
                 <span class="min-w-0 flex-1 text-sm text-muted">Cliente {{ exception.client_id }}</span>
                 <UBadge :color="exception.kind === 'added' ? 'success' : 'neutral'" variant="subtle" :label="exception.kind === 'added' ? 'Incluído' : 'Excluído'" />
                 <UButton
-                  v-if="canManageClients"
+                  v-if="canManageWork"
                   icon="i-lucide-x"
                   color="neutral"
                   variant="ghost"
@@ -538,7 +538,7 @@ async function onGenerate() {
                 :min="1"
                 :max="31"
                 class="w-full"
-                :disabled="!canManageClients"
+                :disabled="!canManageWork"
               />
             </UFormField>
           </div>
@@ -553,7 +553,7 @@ async function onGenerate() {
                 Etapas do modelo ({{ form.steps.length }})
               </h3>
               <UButton
-                v-if="canManageClients"
+                v-if="canManageWork"
                 label="Adicionar etapa"
                 icon="i-lucide-plus"
                 size="xs"
@@ -574,7 +574,7 @@ async function onGenerate() {
                 <span class="shrink-0 text-xs font-semibold text-muted">Ordem {{ step.order }}</span>
                 <div class="min-w-0 flex-1" />
                 <UButton
-                  v-if="canManageClients"
+                  v-if="canManageWork"
                   icon="i-lucide-chevron-up"
                   color="neutral"
                   variant="ghost"
@@ -584,7 +584,7 @@ async function onGenerate() {
                   @click="moveStep(step.key, -1)"
                 />
                 <UButton
-                  v-if="canManageClients"
+                  v-if="canManageWork"
                   icon="i-lucide-chevron-down"
                   color="neutral"
                   variant="ghost"
@@ -594,7 +594,7 @@ async function onGenerate() {
                   @click="moveStep(step.key, 1)"
                 />
                 <UButton
-                  v-if="canManageClients"
+                  v-if="canManageWork"
                   icon="i-lucide-trash-2"
                   color="neutral"
                   variant="ghost"
@@ -609,7 +609,7 @@ async function onGenerate() {
                     v-model="step.title"
                     placeholder="Ex.: Apurar"
                     class="w-full"
-                    :disabled="!canManageClients"
+                    :disabled="!canManageWork"
                   />
                 </UFormField>
                 <UFormField label="Departamento" :name="`step-${step.key}-dept`">
@@ -617,7 +617,7 @@ async function onGenerate() {
                     v-model="step.department"
                     placeholder="Fiscal"
                     class="w-full"
-                    :disabled="!canManageClients"
+                    :disabled="!canManageWork"
                   />
                 </UFormField>
                 <UFormField label="Dia de vencimento" :name="`step-${step.key}-due`">
@@ -627,7 +627,7 @@ async function onGenerate() {
                     :min="1"
                     :max="31"
                     class="w-full"
-                    :disabled="!canManageClients"
+                    :disabled="!canManageWork"
                   />
                 </UFormField>
                 <UFormField label="Prioridade" :name="`step-${step.key}-priority`">
@@ -635,7 +635,7 @@ async function onGenerate() {
                     v-model="step.priority"
                     :items="priorityOptions"
                     class="w-full"
-                    :disabled="!canManageClients"
+                    :disabled="!canManageWork"
                   />
                 </UFormField>
                 <UFormField label="Responsável padrão" :name="`step-${step.key}-assignee`">
@@ -646,7 +646,7 @@ async function onGenerate() {
                     label-key="label"
                     placeholder="Sem responsável"
                     class="w-full"
-                    :disabled="!canManageClients"
+                    :disabled="!canManageWork"
                   />
                 </UFormField>
               </div>
@@ -666,7 +666,7 @@ async function onGenerate() {
                   :min="1"
                   :max="31"
                   class="w-full"
-                  :disabled="!canManageClients"
+                  :disabled="!canManageWork"
                 />
               </UFormField>
               <UFormField label="Mês de referência (gerar)" name="reference_month" help="Formato AAAA-MM.">
@@ -675,13 +675,13 @@ async function onGenerate() {
                   placeholder="2026-03"
                   pattern="\d{4}-(0[1-9]|1[0-2])"
                   class="w-full"
-                  :disabled="!canManageClients"
+                  :disabled="!canManageWork"
                 />
               </UFormField>
             </div>
             <div class="flex flex-wrap gap-2">
               <UButton
-                v-if="canManageClients && !isNew"
+                v-if="canManageWork && !isNew"
                 label="Gerar mês"
                 icon="i-lucide-play"
                 color="primary"

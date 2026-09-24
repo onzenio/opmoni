@@ -17,7 +17,7 @@ dist/
 public/build
 public/hot
 
-# Logs / SO / IDE (não listar .agents/.cursor/.factory/.opencode: skills lá dentro devem ser commitadas)
+# Logs / SO / IDE (não listar .agents: skills lá dentro devem ser commitadas)
 *.log
 logs/
 .DS_Store

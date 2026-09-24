@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\MemberDirectoryResource;
 use App\Models\Account;
 use App\Models\User;
 use App\Services\PlanLimits;
@@ -18,7 +19,7 @@ class AccountMemberController extends Controller
     public function index(): JsonResponse
     {
         $account = $this->tenantAccount();
-        Gate::authorize('viewMembers', $account);
+        Gate::authorize('manageMembers', $account);
 
         return response()->json($this->presentMembers($account));
     }
@@ -61,25 +62,15 @@ class AccountMemberController extends Controller
         $account = $this->tenantAccount();
         Gate::authorize('viewMembers', $account);
 
-        $rows = $account->members()->with('departments')->orderBy('name')->get()
-            ->map(fn (User $member): array => [
-                'id' => $member->getKey(),
-                'name' => $member->name,
-                'role' => $member->pivot->role,
-                'departments' => $member->departments->sortBy('name')->map(fn ($department): array => [
-                    'id' => $department->getKey(),
-                    'name' => $department->name,
-                    'color' => $department->color,
-                ])->values()->all(),
-            ])->all();
+        $rows = $account->members()->with('departments')->orderBy('name')->get();
 
-        return response()->json(['data' => $rows]);
+        return response()->json(['data' => MemberDirectoryResource::collection($rows)->toArray(request())]);
     }
 
     public function show(User $member): JsonResponse
     {
         $account = $this->tenantAccount();
-        Gate::authorize('viewMembers', $account);
+        Gate::authorize('manageMembers', $account);
 
         $role = $member->accountRole($account);
 

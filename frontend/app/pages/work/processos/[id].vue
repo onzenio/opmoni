@@ -56,6 +56,17 @@ const timelineItems = computed(() => tasks.value.map(task => ({
   date: task.due_on ? new Date(`${task.due_on}T00:00:00`).toLocaleDateString('pt-BR') : undefined
 })))
 
+// UStepper existe no @nuxt/ui instalado e é usado aqui como visão horizontal
+// do fluxo, mantendo o UTimeline como detalhe cronológico abaixo.
+const stepperValue = ref<string | number | undefined>(undefined)
+
+const stepperItems = computed(() => tasks.value.map(task => ({
+  value: String(task.id),
+  title: task.title,
+  description: `${statusPresentation(task.status).label}${task.due_on ? ` · ${new Date(`${task.due_on}T00:00:00`).toLocaleDateString('pt-BR')}` : ''}`,
+  icon: statusPresentation(task.status).icon
+})))
+
 type TaskAccordionItem = AccordionItem & { task: WorkTask, locked: boolean }
 
 const accordionItems = computed<TaskAccordionItem[]>(() => tasks.value.map((task, index) => ({
@@ -156,7 +167,15 @@ watch(error, (value) => {
               </h3>
             </div>
           </template>
-          <UTimeline v-if="timelineItems.length > 0" :items="timelineItems" />
+          <UStepper
+            v-if="stepperItems.length > 0"
+            v-model="stepperValue"
+            :items="stepperItems"
+            :linear="false"
+            orientation="horizontal"
+            class="w-full overflow-x-auto pb-2"
+          />
+          <UTimeline v-if="timelineItems.length > 0" :items="timelineItems" class="mt-4" />
           <UEmpty
             v-else
             icon="i-lucide-list-checks"

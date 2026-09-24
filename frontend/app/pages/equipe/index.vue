@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AccountMemberRole } from '~/composables/useMembers'
 import type { MemberDirectoryEntry } from '~/types/team'
 import { useDepartments } from '~/composables/useDepartments'
 import { useMembers } from '~/composables/useMembers'
@@ -6,12 +7,29 @@ import { useMembers } from '~/composables/useMembers'
 definePageMeta({ middleware: 'auth' })
 
 const { list } = useDepartments()
-const { listDirectory } = useMembers()
+const { listDirectory, create, update, remove } = useMembers()
 const toast = useToast()
-const { canManageClients } = useAuth()
+const { canManageMembers } = useAuth()
 
 const search = ref('')
 const departmentFilter = ref<number | null>(null)
+
+const inviteOpen = ref(false)
+const inviting = ref(false)
+const inviteName = ref('')
+const inviteEmail = ref('')
+const invitePassword = ref('')
+const inviteRole = ref<AccountMemberRole>('user')
+
+const removeOpen = ref(false)
+const removing = ref(false)
+const pendingRemove = ref<MemberDirectoryEntry | null>(null)
+
+const roleItems: { label: string, value: AccountMemberRole }[] = [
+  { label: 'Admin', value: 'admin' },
+  { label: 'Operador', value: 'operador' },
+  { label: 'Usuário', value: 'user' }
+]
 
 const { data, status, error, refresh } = await useAsyncData('equipe-directory', async () => {
   const [members, departments] = await Promise.all([listDirectory(), list()])
@@ -19,7 +37,6 @@ const { data, status, error, refresh } = await useAsyncData('equipe-directory', 
 })
 
 const loading = computed(() => status.value === 'pending')
-
 const failed = ref(false)
 
 watch(error, (value) => {
@@ -45,12 +62,14 @@ const departmentOptions = computed(() => (data.value?.departments ?? []).map(dep
 const visibleMembers = computed(() => {
   const term = search.value.trim().toLocaleLowerCase('pt-BR')
   const departmentId = departmentFilter.value
-  return members.value.filter((member) => {
-    if (departmentId != null && !member.departments.some(department => department.id === departmentId)) return false
-    if (!term) return true
-    return member.name.toLocaleLowerCase('pt-BR').includes(term)
-      || member.role.toLocaleLowerCase('pt-BR').includes(term)
-  })
+  return [...members.value]
+    .filter((member) => {
+      if (departmentId != null && !member.departments.some(department => department.id === departmentId)) return false
+      if (!term) return true
+      return member.name.toLocaleLowerCase('pt-BR').includes(term)
+        || member.role.toLocaleLowerCase('pt-BR').includes(term)
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
 })
 
 const hasActiveFilters = computed(() => !!search.value.trim() || departmentFilter.value != null)
@@ -60,40 +79,86 @@ function clearFilters() {
   departmentFilter.value = null
 }
 
-function groupKey(member: MemberDirectoryEntry) {
-  const first = member.name.trim().charAt(0).toLocaleUpperCase('pt-BR')
-  return first || '#'
+function openInvite() {
+  inviteName.value = ''
+  inviteEmail.value = ''
+  invitePassword.value = ''
+  inviteRole.value = 'user'
+  inviteOpen.value = true
 }
 
-const groups = computed(() => {
-  const byLetter = new Map<string, MemberDirectoryEntry[]>()
-  for (const member of visibleMembers.value) {
-    const key = groupKey(member)
-    const list = byLetter.get(key)
-    if (list) list.push(member)
-    else byLetter.set(key, [member])
+async function submitInvite() {
+  if (!canManageMembers.value || inviting.value) return
+  const name = inviteName.value.trim()
+  const email = inviteEmail.value.trim()
+  const password = invitePassword.value
+  if (!name || !email || password.length < 8) return
+
+  inviting.value = true
+  try {
+    await create({ name, email, password, role: inviteRole.value })
+    toast.add({ title: 'Membro convidado', color: 'success' })
+    inviteOpen.value = false
+    await refresh()
+  } catch {
+    toast.add({ title: 'Não foi possível convidar o membro', color: 'error' })
+  } finally {
+    inviting.value = false
   }
-  return [...byLetter.entries()]
-    .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
-    .map(([letter, items]) => ({
-      letter,
-      items: [...items].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-    }))
-})
-
-const rolePresentation: Record<string, { label: string, color: 'primary' | 'info' | 'neutral', icon: string }> = {
-  admin: { label: 'Admin', color: 'primary', icon: 'i-lucide-shield-check' },
-  operador: { label: 'Operador', color: 'info', icon: 'i-lucide-briefcase' },
-  user: { label: 'Usuário', color: 'neutral', icon: 'i-lucide-user' }
 }
 
-function roleOf(member: MemberDirectoryEntry) {
-  return rolePresentation[member.role] ?? { label: member.role, color: 'neutral' as const, icon: 'i-lucide-user' }
+async function onRoleUpdate(member: MemberDirectoryEntry, role: AccountMemberRole) {
+  if (!canManageMembers.value) return
+  try {
+    await update(member.id, { role })
+    toast.add({ title: 'Papel atualizado', color: 'success' })
+    await refresh()
+  } catch {
+    toast.add({ title: 'Não foi possível atualizar o papel', color: 'error' })
+  }
+}
+
+function askRemove(member: MemberDirectoryEntry) {
+  pendingRemove.value = member
+  removeOpen.value = true
+}
+
+async function confirmRemove() {
+  if (!pendingRemove.value || removing.value) return
+  removing.value = true
+  try {
+    await remove(pendingRemove.value.id)
+    toast.add({ title: 'Membro removido', color: 'success' })
+    removeOpen.value = false
+    pendingRemove.value = null
+    await refresh()
+  } catch {
+    toast.add({ title: 'Não foi possível remover o membro', color: 'error' })
+  } finally {
+    removing.value = false
+  }
 }
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 sm:p-6">
+  <div class="flex flex-col gap-4">
+    <UPageCard
+      title="Membros"
+      variant="naked"
+      orientation="horizontal"
+      class="mb-0"
+    >
+      <UButton
+        v-if="canManageMembers"
+        label="Convidar"
+        icon="i-lucide-user-plus"
+        color="neutral"
+        class="w-fit lg:ms-auto"
+        :disabled="loading"
+        @click="openInvite"
+      />
+    </UPageCard>
+
     <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
       <UInput
         v-model="search"
@@ -134,6 +199,7 @@ function roleOf(member: MemberDirectoryEntry) {
         title="Nenhum membro na equipe"
         description="Os membros da conta aparecem aqui automaticamente."
         variant="naked"
+        :actions="canManageMembers ? [{ label: 'Convidar', icon: 'i-lucide-user-plus', onClick: openInvite }] : undefined"
       />
 
       <UEmpty
@@ -145,49 +211,90 @@ function roleOf(member: MemberDirectoryEntry) {
         :actions="hasActiveFilters ? [{ label: 'Limpar filtros', color: 'neutral', variant: 'outline', onClick: clearFilters }] : undefined"
       />
 
-      <section
-        v-for="group in groups"
+      <UPageCard
         v-else
-        :key="group.letter"
-        class="flex flex-col gap-2"
+        variant="subtle"
+        :ui="{ container: 'p-0 sm:p-0 gap-y-0', wrapper: 'items-stretch' }"
       >
-        <h2 class="text-xs font-semibold tracking-wider text-muted uppercase">
-          {{ group.letter }}
-        </h2>
-        <ul class="divide-y divide-default overflow-hidden rounded-lg ring ring-default">
-          <li v-for="member in group.items" :key="member.id" class="flex items-center gap-3 bg-default px-3 py-2.5">
-            <UAvatar :alt="member.name" size="md" />
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-sm font-medium text-highlighted">
-                {{ member.name }}
-              </p>
-              <div v-if="member.departments.length" class="mt-1 flex flex-wrap gap-1">
-                <UBadge
-                  v-for="department in member.departments"
-                  :key="department.id"
-                  :label="department.name"
-                  :color="department.color"
-                  variant="subtle"
-                  size="xs"
-                />
-              </div>
-              <p v-else class="mt-0.5 text-xs text-muted">
-                Sem departamento
-              </p>
-            </div>
-            <UBadge
-              :label="roleOf(member).label"
-              :color="roleOf(member).color"
-              :icon="roleOf(member).icon"
-              variant="subtle"
-            />
-          </li>
-        </ul>
-      </section>
-
-      <p v-if="canManageClients && members.length" class="text-xs text-muted">
-        Para gerenciar convites e papéis, acesse Configurações.
-      </p>
+        <EquipeMembersList
+          :members="visibleMembers"
+          :can-manage="canManageMembers"
+          @update:role="onRoleUpdate"
+          @remove="askRemove"
+        />
+      </UPageCard>
     </template>
+
+    <UModal
+      v-if="canManageMembers"
+      v-model:open="inviteOpen"
+      title="Convidar membro"
+      description="Crie o acesso com nome, e-mail, senha e papel na conta."
+    >
+      <template #body>
+        <form id="invite-member-form" class="space-y-4" @submit.prevent="submitInvite">
+          <UFormField label="Nome" name="name" required>
+            <UInput v-model="inviteName" class="w-full" autofocus />
+          </UFormField>
+          <UFormField label="E-mail" name="email" required>
+            <UInput v-model="inviteEmail" type="email" class="w-full" />
+          </UFormField>
+          <UFormField
+            label="Senha"
+            name="password"
+            required
+            description="Mínimo de 8 caracteres."
+          >
+            <UInput v-model="invitePassword" type="password" class="w-full" />
+          </UFormField>
+          <UFormField label="Papel" name="role" required>
+            <USelect
+              v-model="inviteRole"
+              :items="roleItems"
+              value-key="value"
+              label-key="label"
+              class="w-full"
+            />
+          </UFormField>
+        </form>
+      </template>
+      <template #footer="{ close }">
+        <UButton
+          label="Cancelar"
+          color="neutral"
+          variant="outline"
+          @click="close"
+        />
+        <UButton
+          type="submit"
+          form="invite-member-form"
+          label="Convidar"
+          :loading="inviting"
+          :disabled="!inviteName.trim() || !inviteEmail.trim() || invitePassword.length < 8"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-if="canManageMembers"
+      v-model:open="removeOpen"
+      title="Remover membro"
+      :description="pendingRemove ? `Remover ${pendingRemove.name} desta conta? Essa ação não pode ser desfeita.` : 'Remover membro.'"
+    >
+      <template #footer="{ close }">
+        <UButton
+          label="Cancelar"
+          color="neutral"
+          variant="outline"
+          @click="close"
+        />
+        <UButton
+          label="Remover"
+          color="error"
+          :loading="removing"
+          @click="confirmRemove"
+        />
+      </template>
+    </UModal>
   </div>
 </template>

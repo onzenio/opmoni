@@ -36,9 +36,9 @@ class AccountPolicy
     }
 
     /**
-     * Reading the member list requires any membership in the current tenant
-     * (super_admin in support acts as admin). Inviting, updating or removing
-     * members still requires `manageMembers` (account `admin`).
+     * Reading the member directory requires any membership in the current tenant
+     * (super_admin in support acts as admin). Full member records (index/show,
+     * which expose email) require `manageMembers` (account `admin`).
      */
     public function viewMembers(User $user, Account $account): bool
     {

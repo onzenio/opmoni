@@ -10,7 +10,7 @@ const links = computed(() => equipeTabs(route.path))
 </script>
 
 <template>
-  <UDashboardPanel id="equipe" :ui="{ body: 'min-h-0 flex-1 gap-0 overflow-hidden p-0 sm:p-0' }">
+  <UDashboardPanel id="equipe" :ui="{ body: 'lg:py-12' }">
     <template #header>
       <UDashboardNavbar :title="navbarTitle">
         <template #leading>
@@ -24,7 +24,9 @@ const links = computed(() => equipeTabs(route.path))
     </template>
 
     <template #body>
-      <NuxtPage />
+      <div class="mx-auto flex w-full flex-col gap-4 sm:gap-6 lg:max-w-2xl lg:gap-12">
+        <NuxtPage />
+      </div>
     </template>
   </UDashboardPanel>
 </template>

@@ -26,7 +26,7 @@ class AccountMemberReadTest extends TestCase
 
         $this->actingAs($operador, 'sanctum')
             ->getJson('/api/account/members')
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_user_lists_members(): void
@@ -36,7 +36,24 @@ class AccountMemberReadTest extends TestCase
 
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/account/members')
-            ->assertOk();
+            ->assertForbidden();
+    }
+
+    public function test_admin_and_support_manage_member_records(): void
+    {
+        $account = Account::factory()->create();
+        $admin = $this->memberOf($account, 'admin');
+        $target = $this->memberOf($account, 'user');
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/account/members')
+            ->assertOk()
+            ->assertJsonFragment(['email' => $target->email]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson("/api/account/members/{$target->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('email', $target->email);
     }
 
     public function test_index_show_and_directory_share_read_ability(): void
@@ -47,8 +64,8 @@ class AccountMemberReadTest extends TestCase
 
         foreach ([$operador, $user] as $member) {
             $this->actingAs($member, 'sanctum');
-            $this->getJson('/api/account/members')->assertOk();
-            $this->getJson("/api/account/members/{$user->getKey()}")->assertOk();
+            $this->getJson('/api/account/members')->assertForbidden();
+            $this->getJson("/api/account/members/{$user->getKey()}")->assertForbidden();
             $this->getJson('/api/account/members/directory')->assertOk();
         }
     }
@@ -57,10 +74,10 @@ class AccountMemberReadTest extends TestCase
     {
         $account = Account::factory()->create();
         $other = Account::factory()->create();
-        $operador = $this->memberOf($account, 'operador');
+        $admin = $this->memberOf($account, 'admin');
         $foreign = $this->memberOf($other, 'admin');
 
-        $this->actingAs($operador, 'sanctum')
+        $this->actingAs($admin, 'sanctum')
             ->getJson("/api/account/members/{$foreign->getKey()}")
             ->assertNotFound();
     }

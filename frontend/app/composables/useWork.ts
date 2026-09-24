@@ -57,8 +57,15 @@ export function useWork() {
     const res = await $api<{ data: WorkTask }>(`/tasks/${id}`, { method: 'PATCH', body })
     return res.data
   }
-  async function calendar(from: string, to: string) {
-    const res = await $api<{ data: WorkTask[] }>('/work/calendar', { query: { from, to } })
+  async function calendar(from: string, to: string, params: {
+    process_id?: number
+    client_id?: number
+    status?: string
+    assignee_member_id?: number
+    department?: string
+    priority?: string
+  } = {}) {
+    const res = await $api<{ data: WorkTask[] }>('/work/calendar', { query: { from, to, ...queryOf(params) } })
     return res.data
   }
   async function grouped(referenceMonth: string) {

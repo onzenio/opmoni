@@ -10,4 +10,4 @@ vendor/bin/pint --dirty --format agent  # estilo após editar PHP
 ```
 
 Regras do agente: ver `AGENTS.md` (raiz) e `backend/AGENTS.md`.
-Env local usa `sqlite`; no Docker o compose sobrescreve para `pgsql`/`redis`/`nats`.
+Banco principal: postgres do `docker-compose.yml` (`opmoni/opmoni` em `:5432`); `.env`/`.env.example` usam `pgsql` + `redis`. Testes usam sqlite `:memory:` (só para testar).

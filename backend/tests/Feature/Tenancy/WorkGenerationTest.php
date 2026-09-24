@@ -58,6 +58,47 @@ class WorkGenerationTest extends TestCase
         $this->assertDatabaseMissing('processes', ['client_id' => $out->getKey()]);
     }
 
+    public function test_manual_generate_endpoint_creates_one_process_per_client_and_is_idempotent(): void
+    {
+        $account = Account::factory()->create();
+        $member = $this->memberOf($account, 'admin');
+        $this->actingAs($member, 'sanctum');
+
+        $template = ProcessTemplate::factory()->create([
+            'account_id' => $account->getKey(), 'name' => 'PGDAS',
+            'regimes' => [TaxRegime::SimpleNational->value],
+        ]);
+        $template->steps()->create([
+            'account_id' => $account->getKey(), 'title' => 'Apurar', 'department' => 'Fiscal',
+            'due_day' => 3, 'priority' => 'medium', 'order' => 1,
+        ]);
+
+        foreach (['Alfa SA', 'Beta SA', 'Gama SA'] as $name) {
+            Client::factory()->company()->create([
+                'account_id' => $account->getKey(), 'tax_regime' => TaxRegime::SimpleNational,
+                'status' => 'active', 'name' => $name,
+            ]);
+        }
+
+        $first = $this->postJson("/api/process-templates/{$template->getKey()}/generate", ['reference_month' => '2026-03'])
+            ->assertCreated();
+
+        $this->assertCount(3, $first->json('data'));
+        $this->assertDatabaseCount('processes', 3);
+        $this->assertDatabaseCount('tasks', 3);
+
+        $second = $this->postJson("/api/process-templates/{$template->getKey()}/generate", ['reference_month' => '2026-03'])
+            ->assertCreated();
+
+        $this->assertCount(3, $second->json('data'));
+        $this->assertDatabaseCount('processes', 3);
+        $this->assertDatabaseCount('tasks', 3);
+        $this->assertSame(
+            collect($first->json('data'))->pluck('id')->sort()->values()->all(),
+            collect($second->json('data'))->pluck('id')->sort()->values()->all()
+        );
+    }
+
     public function test_generate_nulls_assignee_outside_step_department(): void
     {
         $account = Account::factory()->create();

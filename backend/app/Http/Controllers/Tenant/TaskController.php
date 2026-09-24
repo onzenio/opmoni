@@ -38,15 +38,13 @@ class TaskController extends Controller
 
         $tasks = Task::query()
             ->with(['process.client'])
-            ->when(isset($filters['process_id']), fn (Builder $query) => $query->where('process_id', $filters['process_id']))
-            ->when(isset($filters['client_id']), fn (Builder $query) => $query->whereHas('process', fn (Builder $processes) => $processes->where('client_id', $filters['client_id'])))
-            ->when(isset($filters['status']), fn (Builder $query) => $query->where('status', $filters['status']))
-            ->when(isset($filters['assignee_member_id']), fn (Builder $query) => $query->where('assignee_member_id', $filters['assignee_member_id']))
-            ->when(isset($filters['department']), fn (Builder $query) => $query->whereRaw('LOWER(department) = ?', [mb_strtolower(trim((string) $filters['department']))]))
-            ->when(isset($filters['priority']), fn (Builder $query) => $query->where('priority', $filters['priority']))
-            ->when(isset($filters['due_from']) || isset($filters['due_to']), fn (Builder $query) => $query
-                ->when(isset($filters['due_from']), fn (Builder $dates) => $dates->whereDate('due_on', '>=', $filters['due_from']))
-                ->when(isset($filters['due_to']), fn (Builder $dates) => $dates->whereDate('due_on', '<=', $filters['due_to'])))
+            ->ofProcess(isset($filters['process_id']) ? (int) $filters['process_id'] : null)
+            ->ofClient(isset($filters['client_id']) ? (int) $filters['client_id'] : null)
+            ->withStatus($filters['status'] ?? null)
+            ->ofAssignee(isset($filters['assignee_member_id']) ? (int) $filters['assignee_member_id'] : null)
+            ->ofDepartment($filters['department'] ?? null)
+            ->ofPriority($filters['priority'] ?? null)
+            ->withDueRange($filters['due_from'] ?? null, $filters['due_to'] ?? null)
             ->ordered()
             ->paginate(25)
             ->withQueryString();
@@ -162,22 +160,55 @@ class TaskController extends Controller
                 ];
             }
 
-            $total = $process->tasks->count();
-            $done = $process->tasks->filter(fn ($task): bool => $this->taskStatus($task) === TaskStatus::Done->value)->count();
+            $progress = $this->progressTotals($process->tasks);
 
             $processEntry = [
                 'process' => ['id' => $process->getKey(), 'name' => $process->name],
-                'totals' => ['tasks' => $total, 'done' => $done],
-                'ratio' => $total > 0 ? round($done / $total, 2) : 0.0,
+                'totals' => ['tasks' => $progress['total'], 'done' => $progress['done'], 'dismissed' => $progress['dismissed'], 'open' => $progress['open']],
+                'progress' => $progress,
+                'ratio' => $progress['ratio'],
                 'tasks' => TaskResource::collection($process->tasks)->resolve(),
             ];
 
             $clients[$clientId]['processes'][] = $processEntry;
             $clients[$clientId]['totals']['processes']++;
-            $clients[$clientId]['totals']['tasks'] += $total;
+            $clients[$clientId]['totals']['tasks'] += $progress['total'];
         }
 
         return response()->json(['data' => array_values($clients)]);
+    }
+
+    /**
+     * Totais alinhados a ProcessController::progressOf: done conta apenas
+     * concluidas, dismissed conta dispensadas separadamente, open e o
+     * restante, e ratio = done/total nos dois payloads.
+     *
+     * @return array{total: int, done: int, dismissed: int, open: int, ratio: float}
+     */
+    private function progressTotals(iterable $tasks): array
+    {
+        $total = 0;
+        $done = 0;
+        $dismissed = 0;
+
+        foreach ($tasks as $task) {
+            $total++;
+            $status = $this->taskStatus($task);
+
+            if ($status === TaskStatus::Done->value) {
+                $done++;
+            } elseif ($status === TaskStatus::Dismissed->value) {
+                $dismissed++;
+            }
+        }
+
+        return [
+            'total' => $total,
+            'done' => $done,
+            'dismissed' => $dismissed,
+            'open' => $total - $done - $dismissed,
+            'ratio' => $total > 0 ? round($done / $total, 2) : 0.0,
+        ];
     }
 
     /**
@@ -190,12 +221,12 @@ class TaskController extends Controller
             ->whereNotNull('due_on')
             ->whereDate('due_on', '>=', $filters['from'])
             ->whereDate('due_on', '<=', $filters['to'])
-            ->when(isset($filters['process_id']), fn (Builder $query) => $query->where('process_id', $filters['process_id']))
-            ->when(isset($filters['client_id']), fn (Builder $query) => $query->whereHas('process', fn (Builder $processes) => $processes->where('client_id', $filters['client_id'])))
-            ->when(isset($filters['status']), fn (Builder $query) => $query->where('status', $filters['status']))
-            ->when(isset($filters['assignee_member_id']), fn (Builder $query) => $query->where('assignee_member_id', $filters['assignee_member_id']))
-            ->when(isset($filters['department']), fn (Builder $query) => $query->whereRaw('LOWER(department) = ?', [mb_strtolower(trim((string) $filters['department']))]))
-            ->when(isset($filters['priority']), fn (Builder $query) => $query->where('priority', $filters['priority']))
+            ->ofProcess(isset($filters['process_id']) ? (int) $filters['process_id'] : null)
+            ->ofClient(isset($filters['client_id']) ? (int) $filters['client_id'] : null)
+            ->withStatus($filters['status'] ?? null)
+            ->ofAssignee(isset($filters['assignee_member_id']) ? (int) $filters['assignee_member_id'] : null)
+            ->ofDepartment($filters['department'] ?? null)
+            ->ofPriority($filters['priority'] ?? null)
             ->ordered();
     }
 

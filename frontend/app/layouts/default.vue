@@ -28,7 +28,7 @@ const links = [[{
   }
 }, {
   label: 'Clientes',
-  icon: 'i-lucide-users',
+  icon: 'i-lucide-building',
   to: '/customers',
   defaultOpen: true,
   type: 'trigger',
@@ -56,7 +56,7 @@ const links = [[{
   }
 }, {
   label: 'Monitoramento',
-  icon: 'i-lucide-radar',
+  icon: 'i-lucide-activity',
   to: '/monitoring',
   type: 'trigger',
   onSelect: () => {
@@ -64,7 +64,7 @@ const links = [[{
   }
 }, {
   label: 'Work',
-  icon: 'i-lucide-briefcase',
+  icon: 'i-lucide-clipboard-list',
   to: '/work',
   type: 'trigger',
   onSelect: () => {
@@ -80,12 +80,6 @@ const links = [[{
     label: 'General',
     to: '/settings',
     exact: true,
-    onSelect: () => {
-      open.value = false
-    }
-  }, {
-    label: 'Members',
-    to: '/settings/members',
     onSelect: () => {
       open.value = false
     }
@@ -109,7 +103,7 @@ const links = [[{
   target: '_blank'
 }, {
   label: 'Help & Support',
-  icon: 'i-lucide-info',
+  icon: 'i-lucide-life-buoy',
   to: 'https://github.com/nuxt-ui-templates/dashboard',
   target: '_blank'
 }]] satisfies NavigationMenuItem[][]
@@ -264,8 +258,7 @@ onMounted(async () => {
       :ui="{ footer: 'lg:border-t lg:border-default' }"
     >
       <template #header="{ collapsed }">
-        <AccountSwitcher v-if="isSuperAdmin" :collapsed="collapsed" />
-        <TeamsMenu v-else :collapsed="collapsed" />
+        <TeamsMenu :collapsed="collapsed" />
       </template>
 
       <template #default="{ collapsed }">

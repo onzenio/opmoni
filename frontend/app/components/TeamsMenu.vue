@@ -5,39 +5,60 @@ defineProps<{
   collapsed?: boolean
 }>()
 
-const teams = ref([{
-  label: 'Nuxt',
+const { accounts, currentAccount, switchAccount, isSuperAdmin } = useAuth()
+const toast = useToast()
+
+const teams = computed(() => accounts.value.map(account => ({
+  id: account.id,
+  label: account.name,
   avatar: {
-    src: 'https://github.com/nuxt.png',
-    alt: 'Nuxt'
+    alt: account.name
   }
-}, {
-  label: 'NuxtHub',
-  avatar: {
-    src: 'https://github.com/nuxt-hub.png',
-    alt: 'NuxtHub'
+})))
+
+const selectedTeam = computed(() => {
+  const team = teams.value.find(item => item.id === currentAccount.value?.id) ?? teams.value[0]
+  if (!team) {
+    return {
+      label: 'Contas',
+      avatar: { alt: 'Contas' }
+    }
   }
-}, {
-  label: 'NuxtLabs',
-  avatar: {
-    src: 'https://github.com/nuxtlabs.png',
-    alt: 'NuxtLabs'
+  return {
+    label: team.label,
+    avatar: team.avatar
   }
-}])
-const selectedTeam = ref(teams.value[0])
+})
+
+async function selectAccount(id: number) {
+  if (id === currentAccount.value?.id) {
+    return
+  }
+  try {
+    await switchAccount(id)
+    window.location.assign('/')
+  } catch {
+    toast.add({ title: 'Não foi possível trocar de conta', color: 'error' })
+  }
+}
 
 const items = computed<DropdownMenuItem[][]>(() => {
-  return [teams.value.map(team => ({
-    ...team,
+  const accountItems = teams.value.map(team => ({
+    label: team.label,
+    avatar: team.avatar,
     onSelect() {
-      selectedTeam.value = team
+      void selectAccount(team.id)
     }
-  })), [{
-    label: 'Create team',
-    icon: 'i-lucide-circle-plus'
-  }, {
-    label: 'Manage teams',
-    icon: 'i-lucide-cog'
+  }))
+
+  if (!isSuperAdmin.value) {
+    return [accountItems]
+  }
+
+  return [accountItems, [{
+    label: 'Gerenciar contas',
+    icon: 'i-lucide-cog',
+    to: '/admin/contas'
   }]]
 })
 </script>

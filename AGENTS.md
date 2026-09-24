@@ -5,7 +5,7 @@ Monorepo sem scripts na raiz. Trabalhe dentro do pacote certo:
 - `backend/` — Laravel 13, PHP `^8.3` (ver `backend/composer.json`). Regras autoritativas em `backend/AGENTS.md` — leia antes de mexer no backend, não duplique aqui.
 - `frontend/` — Nuxt 4 + Vue 3 + Nuxt UI, gerenciador `pnpm@12.5.1` (`packageManager` pinado em `frontend/package.json`).
 - Raiz — só `docker-compose.yml` (backend :8000, frontend :3000, postgres :5432, redis :6379, nats :4222/8222).
-- `openspec/` — specs; skills em `.opencode/skills/openspec-*`.
+- `openspec/` — specs; skills em `.agents/skills/openspec-*`.
 - `.ref/` — referência somente-leitura (template dashboard + chatwoot). Não edite, não importe às cegas.
 
 ## Backend (`cd backend`)
@@ -14,8 +14,7 @@ Monorepo sem scripts na raiz. Trabalhe dentro do pacote certo:
 - Dev: `composer dev` (= `php artisan dev`, multiplex server+queue+vite). Não use `php artisan serve` direto.
 - Teste único: `php artisan test --compact --filter=NomeDoTeste` ou `vendor/bin/phpunit <path>`. Suite cheia: `composer test` (faz `config:clear` antes).
 - Estilo PHP: `vendor/bin/pint --dirty --format agent` após editar PHP.
-- Testes usam sqlite `:memory:` via `phpunit.xml` — não precisa de docker/postgres para testar.
-- Quirk env: `.env.example` padrão é `sqlite/database`; `docker-compose.yml` sobrescreve para `pgsql` + `redis` + `nats`. Não copie valores do compose para `.env` local fora do docker.
+- Banco único: o postgres do `docker-compose.yml` (`opmoni/opmoni` em `:5432`, host `postgres` dentro do compose e `127.0.0.1` fora). `.env`/`.env.example` do backend usam `pgsql` + `redis`; nada de sqlite fora dos testes. Testes usam sqlite `:memory:` via `phpunit.xml` — só para testar, nunca como banco de dev.
 - Criar arquivos via `php artisan make:* --no-interaction` (ex.: `php artisan make:test --phpunit Nome`).
 
 ## Frontend (`cd frontend`)
