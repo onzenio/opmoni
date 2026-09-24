@@ -3,15 +3,31 @@ import type { WorkProcess } from '~/types/work'
 
 definePageMeta({ middleware: 'auth' })
 
+const route = useRoute()
 const toast = useToast()
+const { listProcesses } = useWork()
+
+const referenceMonth = computed(() => {
+  const raw = route.query.reference_month
+  return typeof raw === 'string' && /^\d{4}-\d{2}$/.test(raw) ? raw : undefined
+})
 
 const { data, status, error, refresh } = await useAsyncData<WorkProcess[]>(
   'work-processos',
-  async () => []
+  () => listProcesses({ reference_month: referenceMonth.value }),
+  { watch: [referenceMonth] }
 )
 
 const processes = computed<WorkProcess[]>(() => data.value ?? [])
 const isLoading = computed(() => status.value === 'pending')
+
+function progressPercent(process: WorkProcess): number {
+  return Math.round((process.progress?.ratio ?? 0) * 100)
+}
+
+function formatMonth(value: string | null): string {
+  return value ?? '—'
+}
 
 async function onRefresh() {
   try {
@@ -67,5 +83,31 @@ watch(error, (value) => {
       variant="naked"
       :actions="[{ label: 'Atualizar', icon: 'i-lucide-refresh-cw', onClick: () => onRefresh() }]"
     />
+
+    <ul v-else class="flex flex-col gap-3">
+      <li v-for="process in processes" :key="process.id">
+        <NuxtLink :to="`/work/processos/${process.id}`" class="block">
+          <UCard variant="subtle" :ui="{ body: 'p-4' }">
+            <div class="flex min-w-0 flex-col gap-3">
+              <div class="flex min-w-0 flex-wrap items-center gap-2">
+                <p class="min-w-0 flex-1 truncate text-sm font-semibold text-highlighted" :title="process.name">
+                  {{ process.name }}
+                </p>
+                <UBadge color="neutral" variant="subtle" :label="formatMonth(process.reference_month)" />
+              </div>
+              <p v-if="process.client?.name || process.template?.name" class="truncate text-xs text-muted">
+                {{ process.client?.name ?? '' }}{{ process.client?.name && process.template?.name ? ' · ' : '' }}{{ process.template?.name ?? '' }}
+              </p>
+              <div class="flex items-center gap-3">
+                <UProgress :model-value="progressPercent(process)" class="flex-1" />
+                <span class="shrink-0 text-xs font-medium text-muted">
+                  {{ process.progress ? `${process.progress.done}/${process.progress.total}` : '—' }}
+                </span>
+              </div>
+            </div>
+          </UCard>
+        </NuxtLink>
+      </li>
+    </ul>
   </div>
 </template>

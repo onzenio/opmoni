@@ -1,17 +1,112 @@
 <script setup lang="ts">
-import type { WorkGroupedClient } from '~/types/work'
+import { getGroupedRowModel } from '@tanstack/table-core'
+import type { TableColumn, TableRow } from '@nuxt/ui'
+import type { WorkGroupedClient, WorkTask } from '~/types/work'
 
 definePageMeta({ middleware: 'auth' })
 
+const route = useRoute()
 const toast = useToast()
+const { grouped } = useWork()
+
+const referenceMonth = computed(() => {
+  const raw = route.query.reference_month
+  return typeof raw === 'string' && /^\d{4}-\d{2}$/.test(raw) ? raw : '2026-03'
+})
 
 const { data, status, error, refresh } = await useAsyncData<WorkGroupedClient[]>(
   'work-clientes',
-  async () => []
+  () => grouped(referenceMonth.value),
+  { watch: [referenceMonth] }
 )
 
 const groups = computed<WorkGroupedClient[]>(() => data.value ?? [])
 const isLoading = computed(() => status.value === 'pending')
+
+interface FlatRow {
+  client_id: number
+  client_name: string
+  process_id: number
+  process_name: string
+  ratio: number
+  id: number
+  title: string
+  department: string
+  due_on: string | null
+  priority: string
+  status: WorkTask['status']
+  order: number
+}
+
+const flatTasks = computed<FlatRow[]>(() => {
+  const rows: FlatRow[] = []
+  for (const group of groups.value) {
+    for (const entry of group.processes) {
+      for (const task of entry.tasks) {
+        rows.push({
+          client_id: group.client.id,
+          client_name: group.client.name,
+          process_id: entry.process.id,
+          process_name: entry.process.name,
+          ratio: entry.ratio,
+          id: task.id,
+          title: task.title,
+          department: task.department,
+          due_on: task.due_on,
+          priority: task.priority,
+          status: task.status,
+          order: task.order
+        })
+      }
+    }
+  }
+  return rows
+})
+
+function statusPresentation(taskStatus: WorkTask['status']): { label: string, color: 'info' | 'warning' | 'success' | 'neutral' } {
+  switch (taskStatus) {
+    case 'todo': return { label: 'A fazer', color: 'info' }
+    case 'doing': return { label: 'Em progresso', color: 'warning' }
+    case 'done': return { label: 'Concluída', color: 'success' }
+    case 'dismissed': return { label: 'Dispensada', color: 'neutral' }
+  }
+}
+
+const grouping = ref<string[]>(['client_id', 'process_id'])
+const expanded = ref<true>(true)
+
+const columns: TableColumn<FlatRow>[] = [
+  { accessorKey: 'client_id', header: 'Cliente', enableGrouping: true },
+  { accessorKey: 'process_id', header: 'Processo', enableGrouping: true },
+  {
+    accessorKey: 'title',
+    header: 'Tarefa',
+    aggregatedCell: undefined
+  },
+  { accessorKey: 'status', header: 'Status' },
+  { accessorKey: 'due_on', header: 'Vencimento' }
+]
+
+function groupedTitle(row: TableRow<FlatRow>): string {
+  const columnId = row.groupingColumnId ?? ''
+  if (columnId === 'client_id') {
+    const id = row.groupingValue as number
+    return flatTasks.value.find(candidate => candidate.client_id === id)?.client_name ?? `Cliente ${String(id)}`
+  }
+  if (columnId === 'process_id') {
+    const id = row.groupingValue as number
+    return flatTasks.value.find(candidate => candidate.process_id === id)?.process_name ?? `Processo ${String(id)}`
+  }
+  return ''
+}
+
+function leafCount(row: TableRow<FlatRow>): number {
+  try {
+    return row.getLeafRows().length
+  } catch {
+    return row.subRows.length
+  }
+}
 
 async function onRefresh() {
   try {
@@ -34,6 +129,7 @@ watch(error, (value) => {
         <h2 class="truncate text-base font-semibold tracking-tight text-highlighted sm:text-lg">
           Clientes
         </h2>
+        <span class="shrink-0 text-xs text-muted">{{ referenceMonth }}</span>
       </div>
       <UButton
         icon="i-lucide-refresh-cw"
@@ -67,5 +163,60 @@ watch(error, (value) => {
       variant="naked"
       :actions="[{ label: 'Atualizar', icon: 'i-lucide-refresh-cw', onClick: () => onRefresh() }]"
     />
+
+    <UCard v-else variant="subtle" :ui="{ body: 'p-0 sm:p-0' }">
+      <UTable
+        v-model:grouping="grouping"
+        v-model:expanded="expanded"
+        :data="flatTasks"
+        :columns="columns"
+        :grouping-options="{ getGroupedRowModel: getGroupedRowModel(), groupedColumnMode: 'remove' }"
+        :loading="isLoading"
+      >
+        <template #title-cell="{ row }: { row: TableRow<FlatRow> }">
+          <div class="flex min-w-0 items-center gap-2">
+            <template v-if="row.getIsGrouped()">
+              <UButton
+                :icon="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                :aria-label="row.getIsExpanded() ? 'Recolher' : 'Expandir'"
+                @click="row.getToggleExpandedHandler()()"
+              />
+              <span class="truncate text-sm font-semibold text-highlighted">
+                {{ groupedTitle(row) }}
+              </span>
+              <UBadge color="neutral" variant="subtle" :label="`${leafCount(row)} tarefa(s)`" />
+            </template>
+            <template v-else>
+              <span class="truncate pl-8 text-sm text-highlighted" :title="row.original.title">
+                {{ row.original.title }}
+              </span>
+              <UBadge
+                :color="statusPresentation(row.original.status).color"
+                variant="subtle"
+                :label="statusPresentation(row.original.status).label"
+              />
+            </template>
+          </div>
+        </template>
+
+        <template #status-cell="{ row }: { row: TableRow<FlatRow> }">
+          <UBadge
+            v-if="!row.getIsGrouped()"
+            :color="statusPresentation(row.original.status).color"
+            variant="subtle"
+            :label="statusPresentation(row.original.status).label"
+          />
+        </template>
+
+        <template #due_on-cell="{ row }: { row: TableRow<FlatRow> }">
+          <span v-if="!row.getIsGrouped()" class="text-sm text-muted">
+            {{ row.original.due_on ? new Date(`${row.original.due_on}T00:00:00`).toLocaleDateString('pt-BR') : '—' }}
+          </span>
+        </template>
+      </UTable>
+    </UCard>
   </div>
 </template>
