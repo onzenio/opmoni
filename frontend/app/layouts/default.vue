@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
+import { equipeSidebarChildren } from '~/utils/equipeNav'
 import { monitoringSidebarChildren } from '~/utils/monitoringNav'
 
 const route = useRoute()
@@ -44,6 +45,14 @@ const links = [[{
       open.value = false
     }
   }]
+}, {
+  label: 'Equipe',
+  icon: 'i-lucide-users-round',
+  to: '/equipe',
+  type: 'trigger',
+  onSelect: () => {
+    open.value = false
+  }
 }, {
   label: 'Monitoramento',
   icon: 'i-lucide-radar',
@@ -116,6 +125,16 @@ const navLinks = computed<NavigationMenuItem[][]>(() => {
           active: route.path.startsWith('/customers/certificados') || route.path.startsWith('/customers/procuracao'),
           onSelect: close
         }]
+      }
+    }
+    if (item.label === 'Equipe') {
+      return {
+        ...item,
+        defaultOpen: route.path.startsWith('/equipe'),
+        children: equipeSidebarChildren(route.path).map(child => ({
+          ...child,
+          onSelect: close
+        }))
       }
     }
     if (item.label === 'Monitoramento') {

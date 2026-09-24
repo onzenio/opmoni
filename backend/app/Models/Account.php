@@ -49,6 +49,11 @@ class Account extends Model
         return $this->hasMany(Client::class);
     }
 
+    public function departments(): HasMany
+    {
+        return $this->hasMany(Department::class);
+    }
+
     public function monitorings(): HasMany
     {
         return $this->hasMany(SerproMonitoring::class);
