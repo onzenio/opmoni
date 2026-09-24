@@ -28,7 +28,16 @@ export function useWork() {
     const res = await $api<{ data: WorkProcess }>(`/processes/${id}`)
     return res.data
   }
-  async function listTasks(params: { status?: string, assignee_member_id?: number } = {}) {
+  async function listTasks(params: {
+    process_id?: number
+    client_id?: number
+    status?: string
+    assignee_member_id?: number
+    department?: string
+    priority?: string
+    due_from?: string
+    due_to?: string
+  } = {}) {
     const res = await $api<{ data: WorkTask[] }>('/tasks', { query: queryOf(params) })
     return res.data
   }
