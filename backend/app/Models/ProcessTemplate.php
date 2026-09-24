@@ -37,7 +37,7 @@ class ProcessTemplate extends Model
 
     public function tags(): BelongsToMany
     {
-        return $this->belongsToMany(Tag::class, 'template_tag')->withPivot('account_id');
+        return $this->belongsToMany(Tag::class, 'template_tag', 'template_id', 'tag_id')->withPivot('account_id');
     }
 
     public function exceptions(): HasMany
