@@ -28,6 +28,14 @@ class TaskResource extends JsonResource
             'completed_at' => $this->completed_at?->toDateTimeString(),
             'dismissal_reason' => $this->dismissal_reason,
             'order' => $this->order,
+            'process' => $this->whenLoaded('process', fn () => [
+                'id' => $this->process->getKey(),
+                'name' => $this->process->name,
+                'client' => $this->process->relationLoaded('client') && $this->process->client !== null ? [
+                    'id' => $this->process->client->getKey(),
+                    'name' => $this->process->client->name,
+                ] : null,
+            ]),
         ];
     }
 }

@@ -23,6 +23,7 @@ use App\Http\Controllers\Tenant\ProcessController;
 use App\Http\Controllers\Tenant\ProcessTemplateController;
 use App\Http\Controllers\Tenant\SerproMonitoringController;
 use App\Http\Controllers\Tenant\TagController;
+use App\Http\Controllers\Tenant\TaskController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -63,6 +64,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::apiResource('process-templates', ProcessTemplateController::class);
     Route::get('process-templates/{process_template}/preview', [ProcessTemplateController::class, 'preview']);
     Route::post('process-templates/{process_template}/generate', [ProcessTemplateController::class, 'generate']);
+    Route::apiResource('tasks', TaskController::class)->only(['index', 'show', 'update']);
+    Route::get('work/calendar', [TaskController::class, 'calendar']);
+    Route::get('work/grouped', [TaskController::class, 'grouped']);
     Route::apiResource('account/members', AccountMemberController::class)->parameter('members', 'member');
 });
 
