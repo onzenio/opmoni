@@ -25,6 +25,7 @@ import { sheetBodyClass, sheetTableUi, sheetToolbarUi } from '~/components/data-
 import { formatDate } from '~/utils'
 import { customerDetailPath, customerListPath, parseCustomerList } from '~/utils/customerRoutes'
 import { pinnedDocumentFilter, singleValueFacets, tagFacets } from '~/utils/portfolioFilters'
+import { deadlineStatusAppearance } from '~/utils/portfolioLabels'
 
 const UCheckbox = resolveComponent('UCheckbox')
 
@@ -225,10 +226,10 @@ const regimeOptions = [
 ]
 
 const documentStateOptions = [
-  { label: 'Sem cadastro', value: 'missing', color: 'neutral' as const },
-  { label: 'Válido', value: 'valid', color: 'success' as const },
-  { label: 'A vencer', value: 'expiring', color: 'warning' as const },
-  { label: 'Vencido', value: 'expired', color: 'error' as const }
+  { label: 'Sem cadastro', value: 'missing', color: deadlineStatusAppearance.missing.color },
+  { label: 'Válido', value: 'valid', color: deadlineStatusAppearance.valid.color },
+  { label: 'A vencer', value: 'expiring', color: deadlineStatusAppearance.expiring.color },
+  { label: 'Vencido', value: 'expired', color: deadlineStatusAppearance.expired.color }
 ]
 
 const canFacet = computed(() =>
@@ -774,10 +775,10 @@ async function onDeleted() {
 
 const statusChoices: { label: string, value: DeadlineStatus | 'all', icon: string, iconClass?: string }[] = [
   { label: 'Todos', value: 'all', icon: 'i-lucide-building-2' },
-  { label: 'A vencer', value: 'expiring', icon: 'i-lucide-clock-alert', iconClass: 'text-warning' },
-  { label: 'Vencido', value: 'expired', icon: 'i-lucide-circle-alert', iconClass: 'text-error' },
-  { label: 'Válido', value: 'valid', icon: 'i-lucide-circle-check', iconClass: 'text-success' },
-  { label: 'Sem cadastro', value: 'missing', icon: 'i-lucide-circle-minus', iconClass: 'text-muted' }
+  { label: 'A vencer', value: 'expiring', icon: deadlineStatusAppearance.expiring.icon, iconClass: deadlineStatusAppearance.expiring.iconClass },
+  { label: 'Vencido', value: 'expired', icon: deadlineStatusAppearance.expired.icon, iconClass: deadlineStatusAppearance.expired.iconClass },
+  { label: 'Válido', value: 'valid', icon: deadlineStatusAppearance.valid.icon, iconClass: deadlineStatusAppearance.valid.iconClass },
+  { label: 'Sem cadastro', value: 'missing', icon: deadlineStatusAppearance.missing.icon, iconClass: deadlineStatusAppearance.missing.iconClass }
 ]
 
 const statusTabs = computed<NavigationMenuItem[][]>(() => {

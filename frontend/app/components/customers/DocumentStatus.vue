@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DeadlineStatus } from '~/types/client'
+import { deadlineBadgePresentation } from '~/utils/portfolioLabels'
 
 const props = defineProps<{
   status: DeadlineStatus
@@ -10,20 +11,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{ action: [] }>()
 
-const deadlinePresentation: Record<DeadlineStatus, { label: string, color: 'neutral' | 'success' | 'warning' | 'error', icon: string }> = {
-  missing: { label: 'Sem cadastro', color: 'neutral', icon: 'i-lucide-circle-minus' },
-  valid: { label: 'Válido', color: 'success', icon: 'i-lucide-circle-check' },
-  expiring: { label: 'A vencer', color: 'warning', icon: 'i-lucide-clock-alert' },
-  expired: { label: 'Vencido', color: 'error', icon: 'i-lucide-circle-alert' }
-}
-
 const documentLabel = computed(() => props.kind === 'certificate' ? 'certificado A1' : 'procuração e-CAC')
 
 const badge = computed(() => {
-  const presentation = deadlinePresentation[props.status]
-  if (props.status === 'missing' || !props.value) return { ...presentation, title: undefined }
-  const date = formatDate(props.value)
-  return { ...presentation, label: date, title: `${presentation.label} até ${date}` }
+  const date = props.status !== 'missing' && props.value ? formatDate(props.value) : undefined
+  return deadlineBadgePresentation(props.status, date)
 })
 
 const expiredOn = computed(() => props.value ? formatDate(props.value) : null)

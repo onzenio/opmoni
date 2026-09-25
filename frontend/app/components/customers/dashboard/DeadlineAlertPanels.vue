@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PortfolioAttentionItem } from '~/types/client'
 import { customerListPath } from '~/utils/customerRoutes'
-import { deadlineStatusLabel } from '~/utils/portfolioLabels'
+import { deadlineStatusAppearance, deadlineStatusLabel } from '~/utils/portfolioLabels'
 import { formatDate, formatTaxId } from '~/utils'
 
 const props = defineProps<{
@@ -25,10 +25,6 @@ function filterItems(items: PortfolioAttentionItem[], query: string) {
 
 const certificateRows = computed(() => filterItems(props.certificate, certificateQuery.value))
 const poaRows = computed(() => filterItems(props.poa, poaQuery.value))
-
-function statusColor(status: PortfolioAttentionItem['status']) {
-  return status === 'expired' ? 'error' as const : 'warning' as const
-}
 </script>
 
 <template>
@@ -106,7 +102,7 @@ function statusColor(status: PortfolioAttentionItem['status']) {
           </div>
           <UBadge
             :label="deadlineStatusLabel[item.status]"
-            :color="statusColor(item.status)"
+            :color="deadlineStatusAppearance[item.status].color"
             variant="subtle"
             size="sm"
             class="shrink-0"
@@ -188,7 +184,7 @@ function statusColor(status: PortfolioAttentionItem['status']) {
           </div>
           <UBadge
             :label="deadlineStatusLabel[item.status]"
-            :color="statusColor(item.status)"
+            :color="deadlineStatusAppearance[item.status].color"
             variant="subtle"
             size="sm"
             class="shrink-0"
