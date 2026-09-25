@@ -2,9 +2,11 @@
 
 namespace App\Concerns;
 
+use App\Models\User;
 use App\Tenant\CurrentTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Scopes every query to the current tenant account and fills
@@ -21,7 +23,20 @@ trait BelongsToAccount
             fn ($query, $id) => $query->where($query->getModel()->getTable().'.account_id', $id)
         ));
 
-        static::creating(fn ($model) => $model->account_id ??= resolve(CurrentTenant::class)->accountId);
+        static::creating(function ($model): void {
+            $model->account_id ??= static::resolveCreatingAccountId();
+        });
+    }
+
+    private static function resolveCreatingAccountId(): ?int
+    {
+        $current = resolve(CurrentTenant::class)->accountId;
+
+        if ($current !== null) {
+            return $current;
+        }
+
+        return static::authenticatedUser()?->current_account_id;
     }
 
     /**
@@ -50,8 +65,13 @@ trait BelongsToAccount
             return $current;
         }
 
-        $user = request()->user('sanctum') ?? request()->user();
+        return static::authenticatedUser()?->current_account_id;
+    }
 
-        return $user?->current_account_id;
+    private static function authenticatedUser(): ?User
+    {
+        $user = Auth::guard('sanctum')->user() ?? Auth::user() ?? request()->user('sanctum') ?? request()->user();
+
+        return $user instanceof User ? $user : null;
     }
 }
