@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['account_id', 'name', 'description', 'cascade', 'generate_day', 'due_day', 'is_active', 'regimes'])]
+#[Fillable(['name', 'description', 'cascade', 'generate_day', 'due_day', 'is_active', 'regimes'])]
 class ProcessTemplate extends Model
 {
     /** @use HasFactory<ProcessTemplate> */

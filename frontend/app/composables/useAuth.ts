@@ -38,15 +38,16 @@ export function useAuth() {
   const accounts = useState<AuthAccountLink[]>('auth.accounts', () => [])
   const currentAccount = useState<AuthCurrentAccount | null>('auth.current-account', () => null)
   const currentRole = computed(() => accounts.value.find(account => account.id === currentAccount.value?.id)?.role ?? null)
-  const canManageClients = computed(() => isSuperAdmin.value || currentRole.value === 'admin' || currentRole.value === 'operador')
+  const can = (roles: string[]): boolean => isSuperAdmin.value || roles.includes(currentRole.value ?? '')
+  const canManageClients = computed(() => can(['admin', 'operador']))
   // Escrita em Work (tasks/templates/processes) e em Departamentos exige papel
   // admin|operador na conta (super_admin atua como admin) — espelha
   // TaskPolicy/ProcessTemplatePolicy/DepartmentPolicy no backend.
-  const canManageWork = computed(() => isSuperAdmin.value || currentRole.value === 'admin' || currentRole.value === 'operador')
-  const canManageDepartments = computed(() => isSuperAdmin.value || currentRole.value === 'admin' || currentRole.value === 'operador')
+  const canManageWork = computed(() => can(['admin', 'operador']))
+  const canManageDepartments = computed(() => can(['admin', 'operador']))
   // Gestão de membros (convite/papel/remoção) exige admin na conta —
   // espelha AccountPolicy::manageMembers (super_admin em suporte atua como admin).
-  const canManageMembers = computed(() => isSuperAdmin.value || currentRole.value === 'admin')
+  const canManageMembers = computed(() => can(['admin']))
 
   function applyMe(me: MeResponse) {
     user.value = { id: me.id, name: me.name, email: me.email }
@@ -113,5 +114,5 @@ export function useAuth() {
     return fetchMe()
   }
 
-  return { user, isSuperAdmin, accounts, currentAccount, currentRole, canManageClients, canManageWork, canManageDepartments, canManageMembers, fetchMe, login, register, logout, switchAccount, enterSupport, exitSupport }
+  return { user, isSuperAdmin, accounts, currentAccount, currentRole, can, canManageClients, canManageWork, canManageDepartments, canManageMembers, fetchMe, login, register, logout, switchAccount, enterSupport, exitSupport }
 }

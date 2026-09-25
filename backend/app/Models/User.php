@@ -21,6 +21,9 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
+    /** @var array<int, string|null> */
+    protected array $roleMemo = [];
+
     /**
      * Get the attributes that should be cast.
      *
@@ -42,9 +45,13 @@ class User extends Authenticatable
 
     public function accountRole(Account|int $account): ?string
     {
-        $id = $account instanceof Account ? $account->getKey() : $account;
+        $id = (int) ($account instanceof Account ? $account->getKey() : $account);
 
-        return $this->accountLinks()->where('account_id', $id)->value('role');
+        if (! array_key_exists($id, $this->roleMemo)) {
+            $this->roleMemo[$id] = $this->accountLinks()->where('account_id', $id)->value('role');
+        }
+
+        return $this->roleMemo[$id];
     }
 
     public function accountLinks(): HasMany

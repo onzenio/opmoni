@@ -25,6 +25,13 @@ export default defineNuxtPlugin(() => {
       }
 
       options.headers = headers
+    },
+    async onResponseError({ response }) {
+      if (response.status === 401 || response.status === 419) {
+        await navigateTo('/login')
+      } else if (response.status === 403) {
+        await navigateTo('/')
+      }
     }
   })
 

@@ -133,9 +133,8 @@ class ProcessTemplateController extends Controller
      */
     private function syncRelations(ProcessTemplate $template, array $data): void
     {
-        $tenantId = resolve(CurrentTenant::class)->accountId;
-
         if (array_key_exists('tag_ids', $data)) {
+            $tenantId = resolve(CurrentTenant::class)->accountId;
             $attach = [];
 
             foreach ((array) $data['tag_ids'] as $tagId) {
@@ -150,7 +149,6 @@ class ProcessTemplateController extends Controller
 
             foreach ((array) $data['exceptions'] as $exception) {
                 $template->exceptions()->create([
-                    'account_id' => $tenantId,
                     'client_id' => $exception['client_id'],
                     'kind' => $exception['kind'],
                 ]);
@@ -161,8 +159,9 @@ class ProcessTemplateController extends Controller
             $kept = [];
 
             foreach ((array) $data['steps'] as $step) {
-                $row = array_merge(['account_id' => $tenantId], $step);
+                $row = $step;
                 unset($row['id']);
+                unset($row['account_id']);
 
                 if (isset($step['id'])) {
                     $existing = $template->steps()->whereKey((int) $step['id'])->first();

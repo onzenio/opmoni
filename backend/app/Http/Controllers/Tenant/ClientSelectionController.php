@@ -18,7 +18,16 @@ class ClientSelectionController extends Controller
         ClientSelectionStore $store,
     ): JsonResponse {
         $filters = $request->safe()->only(['q', 'status', 'tax_regime', 'deadline_status', 'certificate_status', 'poa_status', 'tag_id', 'view']);
-        $ids = $portfolio->filtered($filters)->orderBy('id')->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $query = $portfolio->filtered($filters)->orderBy('id');
+
+        if ((clone $query)->count() > 10000) {
+            return response()->json([
+                'message' => 'Seleção excede 10000 itens; refine os filtros ou aguarde processamento assíncrono.',
+                'operation' => 'async-required',
+            ], 422);
+        }
+
+        $ids = $query->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         $selectionId = $store->put(
             (int) resolve(CurrentTenant::class)->accountId,

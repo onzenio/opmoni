@@ -7,8 +7,10 @@ use App\Models\Client;
 use App\Models\Process;
 use App\Models\ProcessTemplate;
 use App\Models\ProcessTemplateTask;
+use App\Models\Task;
 use App\Tenant\CurrentTenant;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -36,8 +38,9 @@ class ProcessGenerationService
         }
 
         $clients = $this->eligibleClients($template);
+        $steps = $template->steps()->orderBy('order')->get();
 
-        return $clients->map(fn (Client $client): Process => DB::transaction(function () use ($template, $client, $reference, $referenceDate): Process {
+        return $clients->map(fn (Client $client): Process => DB::transaction(function () use ($template, $client, $reference, $referenceDate, $steps): Process {
             $process = Process::withoutGlobalScope('account')->where([
                 'account_id' => $template->account_id,
                 'template_id' => $template->getKey(),
@@ -48,28 +51,53 @@ class ProcessGenerationService
                 return $process;
             }
 
-            $process = Process::query()->create([
-                'account_id' => $template->account_id,
-                'name' => $template->name.' '.$reference->format('m/Y'),
-                'template_id' => $template->getKey(),
-                'client_id' => $client->getKey(),
-                'reference_month' => $reference->toDateString(),
-                'status' => 'open',
-                'due_on' => $this->resolveDueDate($reference, (int) $template->due_day),
-            ]);
-
-            foreach ($template->steps()->orderBy('order')->get() as $step) {
-                $process->tasks()->create([
-                    'account_id' => $template->account_id,
-                    'title' => $step->title,
-                    'department' => $step->department,
-                    'description' => $step->description,
-                    'status' => TaskStatus::Todo->value,
-                    'due_on' => $this->resolveDueDate($reference, (int) $step->due_day),
-                    'priority' => $step->priority,
-                    'assignee_member_id' => $this->resolveAssignee($template->account_id, $step),
-                    'order' => $step->order,
+            try {
+                $process = Process::query()->create([
+                    'name' => $template->name.' '.$reference->format('m/Y'),
+                    'template_id' => $template->getKey(),
+                    'client_id' => $client->getKey(),
+                    'reference_month' => $reference->toDateString(),
+                    'status' => 'open',
+                    'due_on' => $this->resolveDueDate($reference, (int) $template->due_day),
                 ]);
+            } catch (QueryException $e) {
+                if (! $this->isUniqueViolation($e)) {
+                    throw $e;
+                }
+
+                $existing = Process::withoutGlobalScope('account')->where([
+                    'account_id' => $template->account_id,
+                    'template_id' => $template->getKey(),
+                    'client_id' => $client->getKey(),
+                ])->whereDate('reference_month', $referenceDate)->lockForUpdate()->first();
+
+                if ($existing instanceof Process) {
+                    return $existing;
+                }
+
+                throw $e;
+            }
+
+            $now = now()->toDateTimeString();
+            // Task::insert bypassa o cast `date` do Eloquent, que serializa como
+            // `Y-m-d H:i:s`; formatar igual preserva o estado observável no banco.
+            $rows = $steps->map(fn (ProcessTemplateTask $step): array => [
+                'account_id' => $template->account_id,
+                'process_id' => $process->getKey(),
+                'title' => $step->title,
+                'department' => $step->department,
+                'description' => $step->description,
+                'status' => TaskStatus::Todo->value,
+                'due_on' => Carbon::parse($this->resolveDueDate($reference, (int) $step->due_day))->toDateTimeString(),
+                'priority' => $step->priority,
+                'assignee_member_id' => $this->resolveAssignee($template->account_id, $step),
+                'order' => $step->order,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])->all();
+
+            if ($rows !== []) {
+                Task::insert($rows);
             }
 
             return $process;
@@ -118,6 +146,22 @@ class ProcessGenerationService
         $added = $template->exceptions()->where('kind', 'added')->pluck('client_id')->all();
 
         return in_array($client->getKey(), $added, true) ? 'added' : 'rule';
+    }
+
+    private function isUniqueViolation(QueryException $e): bool
+    {
+        $code = (string) $e->getCode();
+        $previous = $e->getPrevious();
+
+        if ($previous instanceof \PDOException && is_string($previous->getCode())) {
+            $code = $previous->getCode();
+        }
+
+        if (in_array($code, ['23505', '23000', '19'], true)) {
+            return true;
+        }
+
+        return str_contains(strtolower($e->getMessage()), 'unique constraint');
     }
 
     private function resolveDueDate(Carbon $reference, int $day): string

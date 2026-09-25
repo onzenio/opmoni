@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-#[Fillable(['account_id', 'name', 'color'])]
+#[Fillable(['name', 'color'])]
 class Tag extends Model
 {
     /** @use HasFactory<Tag> */

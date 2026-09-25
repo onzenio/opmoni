@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['account_id', 'template_id', 'client_id', 'kind'])]
+#[Fillable(['template_id', 'client_id', 'kind'])]
 class TemplateClientException extends Model
 {
     use BelongsToAccount;

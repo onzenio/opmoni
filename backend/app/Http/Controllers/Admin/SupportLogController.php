@@ -3,13 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\SupportAccessLogResource;
 use App\Models\SupportAccessLog;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class SupportLogController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): AnonymousResourceCollection
     {
         $data = $request->validate([
             'account_id' => ['sometimes', 'integer', 'exists:accounts,id'],
@@ -20,6 +21,6 @@ class SupportLogController extends Controller
             ->orderByDesc('id')
             ->paginate(15);
 
-        return response()->json($logs);
+        return SupportAccessLogResource::collection($logs);
     }
 }

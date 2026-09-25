@@ -131,7 +131,11 @@ class TaskController extends Controller
 
         $this->ensureDepartmentExists($filters['department'] ?? null);
 
-        return TaskResource::collection($this->filteredQuery($filters)->get());
+        return TaskResource::collection($this->filteredQuery($filters)
+            ->whereBetween('due_on', [$filters['from'], $filters['to']])
+            ->limit(2000)
+            ->with('process.client')
+            ->get());
     }
 
     public function grouped(Request $request): JsonResponse

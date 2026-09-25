@@ -46,3 +46,10 @@ docker-compose.override.yml
 # Ferramentas locais (não versionar: config da máquina + licença de skill copiada)
 .impeccable/
 .agents/skills/frontend-design/LICENSE.txt
+
+# Certificados A1 de dev (conteúdo criptografado — nunca versionar)
+backend/storage/app/private/certificates/
+
+# SQLite acidental (testes usam :memory:; nunca commitar arquivo)
+*.sqlite
+database/database.sqlite

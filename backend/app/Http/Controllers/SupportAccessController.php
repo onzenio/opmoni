@@ -17,12 +17,12 @@ class SupportAccessController extends Controller
             && (int) $user->current_account_id !== (int) $account->getKey();
 
         if ($isForeignEntry) {
-            SupportAccessLog::create([
+            (new SupportAccessLog)->forceFill([
                 'super_admin_user_id' => $user->getKey(),
                 'account_id' => $account->getKey(),
                 'action' => 'enter',
                 'ip' => $request->ip(),
-            ]);
+            ])->save();
         }
 
         $user->forceFill(['current_account_id' => $account->getKey()])->save();
@@ -47,13 +47,13 @@ class SupportAccessController extends Controller
         }
 
         if ($currentAccountId !== null) {
-            SupportAccessLog::create([
+            (new SupportAccessLog)->forceFill([
                 'super_admin_user_id' => $user->getKey(),
                 'account_id' => $currentAccountId,
                 'action' => 'exit',
                 'metadata' => ['restored_account_id' => (int) $homeAccountId],
                 'ip' => $request->ip(),
-            ]);
+            ])->save();
         }
 
         $user->forceFill(['current_account_id' => (int) $homeAccountId])->save();

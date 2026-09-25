@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['super_admin_user_id', 'account_id', 'action', 'metadata', 'ip'])]
+#[Fillable(['super_admin_user_id', 'action', 'metadata', 'ip'])]
 class SupportAccessLog extends Model
 {
     /** @use HasFactory<SupportAccessLog> */

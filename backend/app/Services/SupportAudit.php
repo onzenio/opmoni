@@ -43,12 +43,12 @@ class SupportAudit
             return;
         }
 
-        SupportAccessLog::create([
+        (new SupportAccessLog)->forceFill([
             'super_admin_user_id' => $user->getKey(),
             'account_id' => $tenantId,
             'action' => $verb,
             'metadata' => array_merge(['resource' => $resource, 'resource_id' => $resourceId], $details),
             'ip' => $request->ip(),
-        ]);
+        ])->save();
     }
 }

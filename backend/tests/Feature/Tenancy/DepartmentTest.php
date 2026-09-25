@@ -9,6 +9,7 @@ use App\Models\ProcessTemplate;
 use App\Models\SupportAccessLog;
 use App\Models\Task;
 use App\Models\User;
+use App\Tenant\CurrentTenant;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -225,17 +226,23 @@ class DepartmentTest extends TestCase
             'color' => 'success',
         ])->assertCreated()->json('data.id');
 
+        resolve(CurrentTenant::class)->accountId = $account->getKey();
+
         $template = ProcessTemplate::factory()->create(['account_id' => $account->getKey()]);
         $template->steps()->create([
-            'account_id' => $account->getKey(), 'title' => 'Apurar', 'department' => 'fiscal',
+            'title' => 'Apurar', 'department' => 'fiscal',
             'due_day' => 3, 'priority' => 'medium', 'order' => 1,
         ]);
 
+        resolve(CurrentTenant::class)->accountId = $other->getKey();
+
         $foreignTemplate = ProcessTemplate::factory()->create(['account_id' => $other->getKey()]);
         $foreignTemplate->steps()->create([
-            'account_id' => $other->getKey(), 'title' => 'Apurar', 'department' => 'Fiscal',
+            'title' => 'Apurar', 'department' => 'Fiscal',
             'due_day' => 3, 'priority' => 'medium', 'order' => 1,
         ]);
+
+        resolve(CurrentTenant::class)->accountId = $account->getKey();
 
         $this->deleteJson("/api/departments/{$departmentId}")
             ->assertUnprocessable()

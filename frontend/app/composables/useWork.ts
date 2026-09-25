@@ -1,13 +1,8 @@
-import type { WorkGeneratedProcess, WorkGroupedClient, WorkPreviewRow, WorkProcess, WorkTask, WorkTemplate, WorkTemplatePayload } from '~/types/work'
+import type { WorkGeneratedProcess, WorkGroupedClient, WorkPreviewRow, WorkProcess, WorkProcessDetail, WorkTask, WorkTemplate, WorkTemplatePayload } from '~/types/work'
+import { queryOf } from './useApiQuery'
 
 export function useWork() {
   const { $api } = useNuxtApp()
-  function queryOf(params: object) {
-    return Object.fromEntries(Object.entries(params).flatMap(([key, value]) => {
-      if (value === undefined) return []
-      return [[Array.isArray(value) ? `${key}[]` : key, value]]
-    }))
-  }
   async function listTemplates() {
     const res = await $api<{ data: WorkTemplate[] }>('/process-templates')
     return res.data
@@ -37,7 +32,7 @@ export function useWork() {
     return res.data
   }
   async function showProcess(id: number) {
-    const res = await $api<{ data: WorkProcess }>(`/processes/${id}`)
+    const res = await $api<{ data: WorkProcessDetail }>(`/processes/${id}`)
     return res.data
   }
   async function listTasks(params: {

@@ -32,8 +32,8 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login'])->name('login');
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
 
@@ -52,7 +52,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('clients/selections/{selection}/presence', [ClientSelectionController::class, 'presence']);
     Route::post('clients/bulk-deletions', [ClientBulkDeletionController::class, 'store']);
     Route::get('clients/bulk-deletions/{bulkDeletion}', [ClientBulkDeletionController::class, 'show']);
-    Route::post('clients/cnpj-lookup', ClientCnpjLookupController::class);
+    Route::post('clients/cnpj-lookup', ClientCnpjLookupController::class)
+        ->middleware('throttle:10,1');
     Route::post('clients/{client}/cnpj-refresh-preview', [ClientCnpjRefreshController::class, 'preview']);
     Route::post('clients/{client}/cnpj-refresh', [ClientCnpjRefreshController::class, 'update']);
     Route::post('clients/{client}/certificate', [ClientCertificateController::class, 'store']);

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['account_id', 'user_id', 'name', 'q', 'filters'])]
+#[Fillable(['user_id', 'name', 'q', 'filters'])]
 class ClientSavedFilter extends Model
 {
     use BelongsToAccount;
@@ -30,9 +30,18 @@ class ClientSavedFilter extends Model
         });
     }
 
+    /**
+     * Resolve the acting user for the `owner` scope without touching the
+     * request helper, so jobs and console commands filter `user_id`
+     * explicitly instead of inheriting a stale HTTP user.
+     */
     private static function actingUserId(): ?int
     {
-        $user = request()->user('sanctum') ?? request()->user();
+        $user = auth('sanctum')->user() ?? auth()->user();
+
+        if ($user === null && app()->runningInConsole()) {
+            return null;
+        }
 
         return $user?->getKey();
     }

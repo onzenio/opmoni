@@ -15,6 +15,8 @@ class ClientResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $deadlines = once(fn (): DeadlineState => resolve(DeadlineState::class));
+
         return [
             'id' => $this->getKey(),
             'person_type' => $this->person_type?->value,
@@ -48,12 +50,12 @@ class ClientResource extends JsonResource
                 'currentCertificate',
                 fn () => $this->currentCertificate === null ? null : new ClientCertificateResource($this->currentCertificate)
             ),
-            'certificate_status' => resolve(DeadlineState::class)->for($this->currentCertificate?->valid_until)->value,
+            'certificate_status' => $deadlines->for($this->currentCertificate?->valid_until)->value,
             'ecac_power_of_attorney' => $this->whenLoaded(
                 'ecacPowerOfAttorney',
                 fn () => $this->ecacPowerOfAttorney === null ? null : new ClientEcacPowerOfAttorneyResource($this->ecacPowerOfAttorney)
             ),
-            'ecac_power_of_attorney_status' => resolve(DeadlineState::class)->for($this->ecacPowerOfAttorney?->expires_at)->value,
+            'ecac_power_of_attorney_status' => $deadlines->for($this->ecacPowerOfAttorney?->expires_at)->value,
             'source_updated_at' => $this->source_updated_at?->toISOString(),
             'looked_up_at' => $this->looked_up_at?->toISOString(),
             'tags' => $this->whenLoaded('tags', fn () => $this->tags->map(fn ($tag) => [
