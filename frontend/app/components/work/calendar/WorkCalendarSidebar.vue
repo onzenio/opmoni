@@ -2,6 +2,7 @@
 import type { DateValue } from '@internationalized/date'
 import { CalendarDate } from '@internationalized/date'
 import type { WorkTaskStatus, WorkTaskPriority } from '~/types/work'
+import { calendarPriorityOptions, countActiveCalendarFilters } from '~/utils/calendarUi'
 import { parseDateKey, statusPresentation } from '~/utils/workCalendar'
 
 const props = defineProps<{
@@ -36,13 +37,15 @@ const statusItems: { key: WorkTaskStatus, label: string }[] = [
   { key: 'dismissed', label: statusPresentation('dismissed').label }
 ]
 
-const priorityItems: { label: string, value: WorkTaskPriority | '' }[] = [
-  { label: 'Todas', value: '' },
-  { label: 'Baixa', value: 'low' },
-  { label: 'Média', value: 'medium' },
-  { label: 'Alta', value: 'high' },
-  { label: 'Urgente', value: 'urgent' }
-]
+const filtersOpen = ref(false)
+
+const activeFilterCount = computed(() => countActiveCalendarFilters({
+  processId: props.processId,
+  clientId: props.clientId,
+  assigneeId: props.assigneeId,
+  department: props.department,
+  priority: props.priority
+}))
 
 const miniValue = computed({
   get(): DateValue | undefined {
@@ -63,14 +66,16 @@ function toggleStatus(key: WorkTaskStatus, on: boolean) {
 </script>
 
 <template>
-  <aside class="flex w-full shrink-0 flex-col gap-4 lg:w-64">
+  <aside class="flex max-h-[min(45vh,32rem)] w-full shrink-0 flex-col gap-4 overflow-y-auto pe-1 lg:max-h-none lg:w-64 lg:border-e lg:border-default lg:pe-5">
     <UCalendar
       v-model="miniValue"
-      class="w-full rounded-lg p-2 ring ring-default"
+      as="section"
+      locale="pt-BR"
+      class="w-full"
     />
 
-    <div class="flex flex-col gap-2">
-      <p class="text-xs font-semibold uppercase tracking-wide text-muted">
+    <div class="flex flex-col gap-2 border-t border-default pt-4">
+      <p class="text-xs font-medium text-muted">
         Status
       </p>
       <label
@@ -90,76 +95,101 @@ function toggleStatus(key: WorkTaskStatus, on: boolean) {
       </label>
     </div>
 
-    <div class="flex flex-col gap-3">
-      <p class="text-xs font-semibold uppercase tracking-wide text-muted">
-        Filtros
-      </p>
-      <UFormField label="Processo">
-        <USelectMenu
-          :model-value="processId"
-          :items="processOptions"
-          value-key="value"
-          label-key="label"
-          placeholder="Todos"
-          clear
-          class="w-full"
-          @update:model-value="emit('update:processId', ($event as number | null) ?? null)"
-        />
-      </UFormField>
-      <UFormField label="Cliente">
-        <USelectMenu
-          :model-value="clientId"
-          :items="clientOptions"
-          value-key="value"
-          label-key="label"
-          placeholder="Todos"
-          clear
-          class="w-full"
-          @update:model-value="emit('update:clientId', ($event as number | null) ?? null)"
-        />
-      </UFormField>
-      <UFormField label="Responsável">
-        <USelectMenu
-          :model-value="assigneeId"
-          :items="assigneeOptions"
-          value-key="value"
-          label-key="label"
-          placeholder="Todos"
-          clear
-          class="w-full"
-          @update:model-value="emit('update:assigneeId', ($event as number | null) ?? null)"
-        />
-      </UFormField>
-      <UFormField label="Departamento">
-        <USelectMenu
-          :model-value="department || undefined"
-          :items="departmentOptions"
-          value-key="value"
-          label-key="label"
-          placeholder="Todos"
-          clear
-          class="w-full"
-          @update:model-value="emit('update:department', typeof $event === 'string' ? $event : '')"
-        />
-      </UFormField>
-      <UFormField label="Prioridade">
-        <USelect
-          :model-value="priority"
-          :items="priorityItems"
-          value-key="value"
-          label-key="label"
-          class="w-full"
-          @update:model-value="emit('update:priority', $event as WorkTaskPriority | '')"
-        />
-      </UFormField>
-      <UButton
-        label="Limpar filtros"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        class="self-start"
-        @click="emit('clear')"
-      />
-    </div>
+    <UCollapsible v-model:open="filtersOpen" class="border-t border-default pt-2">
+      <template #default="{ open }">
+        <UButton
+          color="neutral"
+          variant="ghost"
+          class="w-full justify-start px-1.5"
+          :trailing-icon="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+          :aria-label="open ? 'Recolher filtros' : 'Expandir filtros'"
+        >
+          <span class="flex min-w-0 flex-1 items-center gap-2 text-left">
+            <UIcon name="i-lucide-sliders-horizontal" class="size-4 shrink-0 text-muted" />
+            <span>Filtros</span>
+            <UBadge
+              v-if="activeFilterCount"
+              :label="String(activeFilterCount)"
+              color="primary"
+              variant="subtle"
+              size="sm"
+            />
+          </span>
+        </UButton>
+      </template>
+
+      <template #content>
+        <div class="flex flex-col gap-3 px-1.5 pb-1 pt-3">
+          <UFormField label="Processo">
+            <USelectMenu
+              :model-value="processId"
+              :items="processOptions"
+              value-key="value"
+              label-key="label"
+              placeholder="Todos"
+              clear
+              class="w-full"
+              @update:model-value="emit('update:processId', ($event as number | null) ?? null)"
+            />
+          </UFormField>
+          <UFormField label="Cliente">
+            <USelectMenu
+              :model-value="clientId"
+              :items="clientOptions"
+              value-key="value"
+              label-key="label"
+              placeholder="Todos"
+              clear
+              class="w-full"
+              @update:model-value="emit('update:clientId', ($event as number | null) ?? null)"
+            />
+          </UFormField>
+          <UFormField label="Responsável">
+            <USelectMenu
+              :model-value="assigneeId"
+              :items="assigneeOptions"
+              value-key="value"
+              label-key="label"
+              placeholder="Todos"
+              clear
+              class="w-full"
+              @update:model-value="emit('update:assigneeId', ($event as number | null) ?? null)"
+            />
+          </UFormField>
+          <UFormField label="Departamento">
+            <USelectMenu
+              :model-value="department || undefined"
+              :items="departmentOptions"
+              value-key="value"
+              label-key="label"
+              placeholder="Todos"
+              clear
+              class="w-full"
+              @update:model-value="emit('update:department', typeof $event === 'string' ? $event : '')"
+            />
+          </UFormField>
+          <UFormField label="Prioridade">
+            <USelect
+              :model-value="priority || undefined"
+              :items="calendarPriorityOptions"
+              value-key="value"
+              label-key="label"
+              placeholder="Todas"
+              class="w-full"
+              @update:model-value="emit('update:priority', ($event as WorkTaskPriority | undefined) ?? '')"
+            />
+          </UFormField>
+          <UButton
+            label="Limpar filtros"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            class="self-start px-1.5"
+            :disabled="activeFilterCount === 0"
+            @click="emit('clear')"
+          />
+        </div>
+      </template>
+    </UCollapsible>
   </aside>
 </template>

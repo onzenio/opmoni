@@ -212,6 +212,7 @@ function apiStatus(error: unknown): number | undefined {
 }
 
 const selectedTask = ref<WorkTask | null>(null)
+const taskAnchor = ref<HTMLElement | null>(null)
 const popoverOpen = ref(false)
 const busyId = ref<number | null>(null)
 const optimistic = ref(new Map<number, string>())
@@ -232,8 +233,9 @@ const displayByDay = computed(() => {
   return base
 })
 
-function openTask(task: WorkTask) {
+function openTask(task: WorkTask, event?: MouseEvent) {
   selectedTask.value = task
+  taskAnchor.value = event?.currentTarget instanceof HTMLElement ? event.currentTarget : null
   popoverOpen.value = true
 }
 
@@ -355,13 +357,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden p-3 sm:p-4 lg:p-5">
-    <header class="flex min-w-0 flex-wrap items-center gap-2">
-      <div class="flex min-w-0 flex-1 items-center gap-2.5">
-        <UIcon name="i-lucide-calendar-days" class="size-5 shrink-0 text-primary" />
-        <h2 class="truncate text-base font-semibold tracking-tight text-highlighted capitalize sm:text-lg">
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <header class="flex min-w-0 flex-wrap items-center gap-3 border-b border-default px-4 py-3 sm:px-5 lg:px-6">
+      <div class="min-w-0 flex-1">
+        <h1 class="truncate text-xl font-semibold tracking-tight text-highlighted first-letter:uppercase sm:text-2xl">
           {{ title }}
-        </h2>
+        </h1>
       </div>
 
       <UTabs
@@ -369,44 +370,46 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         :items="viewItems"
         :content="false"
         size="sm"
-        class="w-auto"
+        class="order-3 w-full sm:order-none sm:w-auto"
         @update:model-value="(value) => { view = value as CalendarView }"
       />
 
-      <UButton
-        icon="i-lucide-chevron-left"
-        color="neutral"
-        variant="outline"
-        aria-label="Período anterior"
-        :disabled="isLoading"
-        @click="goPrev"
-      />
-      <UButton
-        label="Hoje"
-        color="neutral"
-        variant="outline"
-        :disabled="isLoading"
-        @click="goToday"
-      />
-      <UButton
-        icon="i-lucide-chevron-right"
-        color="neutral"
-        variant="outline"
-        aria-label="Próximo período"
-        :disabled="isLoading"
-        @click="goNext"
-      />
-      <UButton
-        icon="i-lucide-refresh-cw"
-        color="neutral"
-        variant="ghost"
-        aria-label="Atualizar"
-        :loading="isLoading"
-        @click="onRefresh"
-      />
+      <div class="flex shrink-0 items-center gap-1">
+        <UButton
+          icon="i-lucide-chevron-left"
+          color="neutral"
+          variant="ghost"
+          aria-label="Período anterior"
+          :disabled="isLoading"
+          @click="goPrev"
+        />
+        <UButton
+          label="Hoje"
+          color="neutral"
+          variant="soft"
+          :disabled="isLoading"
+          @click="goToday"
+        />
+        <UButton
+          icon="i-lucide-chevron-right"
+          color="neutral"
+          variant="ghost"
+          aria-label="Próximo período"
+          :disabled="isLoading"
+          @click="goNext"
+        />
+        <UButton
+          icon="i-lucide-refresh-cw"
+          color="neutral"
+          variant="ghost"
+          aria-label="Atualizar calendário"
+          :loading="isLoading"
+          @click="onRefresh"
+        />
+      </div>
     </header>
 
-    <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden lg:flex-row">
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row lg:px-5 lg:py-4 xl:px-6">
       <WorkCalendarSidebar
         :model-date="focusDate"
         :status-visible="statusVisible"
@@ -429,10 +432,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         @clear="clearFilters"
       />
 
-      <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg ring ring-default">
+      <main class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:ps-5">
         <UAlert
           v-if="error"
-          class="m-3"
+          class="m-3 lg:m-0 lg:mb-4"
           color="error"
           variant="subtle"
           title="Não foi possível carregar o calendário"
@@ -449,7 +452,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           variant="naked"
         />
 
-        <WorkMonthGrid
+        <WorkCalendarWorkMonthGrid
           v-else-if="view === 'month'"
           :anchor-date="focusDate"
           :tasks-by-day="displayByDay"
@@ -457,10 +460,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           :can-drag="canManageWork"
           :busy-id="busyId"
           @select="openTask"
+          @select-date="onMiniDate"
           @drop="onDrop"
         />
 
-        <WorkDayColumns
+        <WorkCalendarWorkDayColumns
           v-else
           :day-keys="dayColumnKeys"
           :tasks-by-day="displayByDay"
@@ -468,12 +472,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           :single="view === 'day'"
           @select="openTask"
         />
-      </div>
+      </main>
     </div>
 
     <WorkCalendarTaskPopover
       v-model:open="popoverOpen"
       :task="selectedTask"
+      :anchor="taskAnchor"
       :can-manage="canManageWork"
       :busy="busyId === selectedTask?.id"
       :member-options="assigneeOptions"

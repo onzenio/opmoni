@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { WorkTask } from '~/types/work'
+import { accessibleDateLabel } from '~/utils/calendarUi'
 import { parseDateKey, statusPresentation } from '~/utils/workCalendar'
 
 defineProps<{
@@ -10,7 +11,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  select: [task: WorkTask]
+  select: [task: WorkTask, event: MouseEvent]
 }>()
 
 function dayLabel(key: string) {
@@ -26,15 +27,16 @@ function dayLabel(key: string) {
 
 <template>
   <div
-    class="grid min-h-0 flex-1 gap-2 overflow-auto"
+    class="grid min-h-0 flex-1 gap-px overflow-auto bg-default"
     :class="single ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-7'"
   >
     <div
       v-for="key in dayKeys"
       :key="key"
-      class="flex min-h-40 flex-col rounded-lg ring ring-default"
+      class="flex min-h-40 min-w-0 flex-col bg-default"
+      :aria-label="accessibleDateLabel(key)"
     >
-      <div class="border-b border-default px-3 py-2 text-sm font-medium capitalize text-highlighted">
+      <div class="border-b border-default px-3 py-2 text-sm font-medium first-letter:uppercase text-highlighted">
         {{ dayLabel(key) }}
       </div>
 
@@ -56,8 +58,9 @@ function dayLabel(key: string) {
         <li v-for="task in tasksByDay.get(key)" :key="task.id">
           <button
             type="button"
-            class="flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-elevated"
-            @click="emit('select', task)"
+            class="flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-elevated focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+            :aria-label="`${task.title}, ${statusPresentation(task.status).label}, ${accessibleDateLabel(key)}`"
+            @click="emit('select', task, $event)"
           >
             <span class="flex min-w-0 items-center gap-1.5 text-sm font-medium text-highlighted">
               <span

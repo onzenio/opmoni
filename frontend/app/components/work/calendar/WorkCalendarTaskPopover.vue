@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { useMediaQuery } from '@vueuse/core'
 import type { WorkTask } from '~/types/work'
-import { statusPresentation } from '~/utils/workCalendar'
 
 const props = defineProps<{
   task: WorkTask | null
   open: boolean
+  anchor?: HTMLElement | null
   canManage: boolean
   busy?: boolean
   memberOptions: { label: string, value: number }[]
@@ -18,6 +19,7 @@ const emit = defineEmits<{
   'dismiss': [task: WorkTask, reason: string]
 }>()
 
+const isMobile = useMediaQuery('(max-width: 767px)')
 const dismissOpen = ref(false)
 const dismissReason = ref('')
 
@@ -28,18 +30,12 @@ watch(() => props.open, (value) => {
   }
 })
 
-const canAdvance = computed(() => props.task && (props.task.status === 'todo' || props.task.status === 'doing'))
-const canBack = computed(() => props.task && (props.task.status === 'doing' || props.task.status === 'done'))
-const canDismiss = computed(() => props.task && props.task.status !== 'dismissed')
-
-function formatDue(due: string | null) {
-  if (!due) return 'Sem prazo'
-  return new Date(`${due}T00:00:00`).toLocaleDateString('pt-BR')
+function requestDismiss() {
+  if (props.task) dismissOpen.value = true
 }
 
 function confirmDismiss() {
-  if (!props.task) return
-  if (!dismissReason.value.trim()) return
+  if (!props.task || !dismissReason.value.trim()) return
   emit('dismiss', props.task, dismissReason.value.trim())
   dismissOpen.value = false
   dismissReason.value = ''
@@ -47,86 +43,51 @@ function confirmDismiss() {
 </script>
 
 <template>
+  <UPopover
+    v-if="!isMobile && task"
+    :open="open"
+    :reference="anchor ?? undefined"
+    :content="{ align: 'start', side: 'bottom', sideOffset: 8 }"
+    :ui="{ content: 'overflow-hidden p-0' }"
+    @update:open="emit('update:open', $event)"
+  >
+    <template #content>
+      <div class="w-80 max-w-[calc(100vw-2rem)] bg-default">
+        <WorkCalendarTaskDetails
+          :task="task"
+          :can-manage="canManage"
+          :busy="busy"
+          :member-options="memberOptions"
+          @advance="emit('advance', $event)"
+          @back="emit('back', $event)"
+          @assign="(selectedTask, memberId) => emit('assign', selectedTask, memberId)"
+          @request-dismiss="requestDismiss"
+        />
+      </div>
+    </template>
+  </UPopover>
+
   <UModal
+    v-else-if="isMobile"
     :open="open"
     :title="task?.title ?? 'Tarefa'"
     :description="task ? `${task.process?.client?.name ?? 'Sem cliente'} · ${task.process?.name ?? 'Processo'}` : undefined"
     @update:open="emit('update:open', $event)"
   >
     <template v-if="task" #body>
-      <div class="space-y-3 text-sm">
-        <div class="flex flex-wrap items-center gap-2">
-          <UBadge
-            :label="statusPresentation(task.status).label"
-            :color="statusPresentation(task.status).color"
-            variant="subtle"
-          />
-          <UBadge :label="task.priority" color="neutral" variant="outline" />
-        </div>
-        <p class="text-muted">
-          Departamento: <span class="text-highlighted">{{ task.department || '—' }}</span>
-        </p>
-        <p class="text-muted">
-          Vencimento: <span class="text-highlighted">{{ formatDue(task.due_on) }}</span>
-        </p>
-        <UFormField v-if="canManage" label="Responsável">
-          <USelectMenu
-            :model-value="task.assignee_member_id"
-            :items="memberOptions"
-            value-key="value"
-            label-key="label"
-            placeholder="Sem responsável"
-            clear
-            class="w-full"
-            :disabled="busy"
-            @update:model-value="emit('assign', task, ($event as number | null) ?? null)"
-          />
-        </UFormField>
-        <p v-else class="text-muted">
-          Responsável: <span class="text-highlighted">{{ task.assignee_member_id ?? '—' }}</span>
-        </p>
-        <NuxtLink
-          :to="`/work/processos/${task.process?.id}`"
-          class="inline-flex items-center gap-1 text-primary hover:underline"
-        >
-          <UIcon name="i-lucide-external-link" class="size-3.5" />
-          Abrir processo
-        </NuxtLink>
-      </div>
-    </template>
-    <template v-if="task && canManage" #footer="{ close }">
-      <div class="flex w-full flex-wrap items-center gap-2">
-        <UButton
-          v-if="canBack"
-          label="Retornar"
-          color="neutral"
-          variant="outline"
-          :loading="busy"
-          @click="emit('back', task)"
-        />
-        <UButton
-          v-if="canAdvance"
-          :label="task.status === 'todo' ? 'Avançar' : 'Concluir'"
-          color="primary"
-          :loading="busy"
-          @click="emit('advance', task)"
-        />
-        <UButton
-          v-if="canDismiss"
-          label="Dispensar"
-          color="neutral"
-          variant="ghost"
-          :disabled="busy"
-          @click="dismissOpen = true"
-        />
-        <span class="flex-1" />
-        <UButton
-          label="Fechar"
-          color="neutral"
-          variant="soft"
-          @click="close"
-        />
-      </div>
+      <WorkCalendarTaskDetails
+        :task="task"
+        :can-manage="canManage"
+        :busy="busy"
+        :member-options="memberOptions"
+        :show-title="false"
+        show-close
+        @advance="emit('advance', $event)"
+        @back="emit('back', $event)"
+        @assign="(selectedTask, memberId) => emit('assign', selectedTask, memberId)"
+        @request-dismiss="requestDismiss"
+        @close="emit('update:open', false)"
+      />
     </template>
   </UModal>
 
