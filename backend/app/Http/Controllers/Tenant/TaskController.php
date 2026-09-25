@@ -131,8 +131,9 @@ class TaskController extends Controller
 
         $this->ensureDepartmentExists($filters['department'] ?? null);
 
+        // filteredQuery já aplica whereDate no intervalo; whereBetween com
+        // bound de data pura cortaria o último dia se due_on tiver horário.
         return TaskResource::collection($this->filteredQuery($filters)
-            ->whereBetween('due_on', [$filters['from'], $filters['to']])
             ->limit(2000)
             ->with('process.client')
             ->get());

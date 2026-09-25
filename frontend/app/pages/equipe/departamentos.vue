@@ -30,7 +30,6 @@ watch(error, (value) => {
 
 async function retry() {
   failed.value = false
-  clearError()
   await refresh()
 }
 

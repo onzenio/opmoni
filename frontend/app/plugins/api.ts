@@ -1,6 +1,7 @@
-export default defineNuxtPlugin(() => {
+export default defineNuxtPlugin((nuxtApp) => {
   const config = useRuntimeConfig()
   const incoming = import.meta.server ? useRequestHeaders(['cookie']) : null
+  // Criado no setup do plugin: .value acompanha o cookie após /sanctum/csrf-cookie
   const xsrfToken = useCookie<string | null>('XSRF-TOKEN')
   const baseURL = import.meta.server
     ? `${config.apiUrl}/api`
@@ -27,10 +28,11 @@ export default defineNuxtPlugin(() => {
       options.headers = headers
     },
     async onResponseError({ response }) {
+      // ofetch callbacks perdem o async context do Nuxt — wrap obrigatório.
+      // Só sessão inválida/expirada: 403 de Gate/tenant fica para a página
+      // (toast, empty state) — redirecionar aqui derruba fluxos legítimos.
       if (response.status === 401 || response.status === 419) {
-        await navigateTo('/login')
-      } else if (response.status === 403) {
-        await navigateTo('/')
+        await nuxtApp.runWithContext(() => navigateTo('/login'))
       }
     }
   })
