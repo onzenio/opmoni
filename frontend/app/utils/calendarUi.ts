@@ -36,3 +36,15 @@ export function accessibleDateLabel(dateKey: string, locale = 'pt-BR') {
     year: 'numeric'
   }).format(date)
 }
+
+export function monthTitleParts(key: string, locale = 'pt-BR'): { months: string, year: string } {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key)
+  if (!match) return { months: 'Calendário', year: '' }
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const date = new Date(year, month - 1, 1)
+  return {
+    months: date.toLocaleDateString(locale, { month: 'long' }),
+    year: String(year)
+  }
+}

@@ -1,9 +1,16 @@
 <script setup lang="ts">
+/**
+ * Ported from nuxt-ui-templates/calendar sidebar pieces:
+ * - `components/calendar/List.vue` (status visibility ≈ calendars list)
+ * - `components/calendar/Mini.vue`
+ * - `components/AppSidebar.vue` flex: list → mt-auto separator → mini
+ * Operational filters remain Opmoni-domain (collapsed).
+ */
 import type { DateValue } from '@internationalized/date'
 import { CalendarDate } from '@internationalized/date'
 import type { WorkTaskStatus, WorkTaskPriority } from '~/types/work'
 import { calendarPriorityOptions, countActiveCalendarFilters } from '~/utils/calendarUi'
-import { parseDateKey, statusPresentation } from '~/utils/workCalendar'
+import { calendarStatusPresentation, parseDateKey } from '~/utils/workCalendar'
 
 const props = defineProps<{
   modelDate: string
@@ -30,12 +37,16 @@ const emit = defineEmits<{
   'clear': []
 }>()
 
-const statusItems: { key: WorkTaskStatus, label: string }[] = [
-  { key: 'todo', label: statusPresentation('todo').label },
-  { key: 'doing', label: statusPresentation('doing').label },
-  { key: 'done', label: statusPresentation('done').label },
-  { key: 'dismissed', label: statusPresentation('dismissed').label }
-]
+const statusItems = computed(() => ([
+  { label: 'Status', type: 'label' as const },
+  ...(['todo', 'doing', 'done', 'dismissed'] as WorkTaskStatus[]).map(key => ({
+    label: calendarStatusPresentation(key).label,
+    color: calendarStatusPresentation(key).color,
+    value: key,
+    slot: 'status' as const,
+    as: 'div' as const
+  }))
+]))
 
 const filtersOpen = ref(false)
 
@@ -60,66 +71,61 @@ const miniValue = computed({
   }
 })
 
-function toggleStatus(key: WorkTaskStatus, on: boolean) {
-  emit('update:statusVisible', { ...props.statusVisible, [key]: on })
+function toggleStatus(key: WorkTaskStatus, on: boolean | 'indeterminate') {
+  emit('update:statusVisible', { ...props.statusVisible, [key]: Boolean(on) })
 }
 </script>
 
 <template>
-  <aside class="flex max-h-[min(45vh,32rem)] w-full shrink-0 flex-col gap-4 overflow-y-auto pe-1 lg:max-h-none lg:w-64 lg:border-e lg:border-default lg:pe-5">
-    <UCalendar
-      v-model="miniValue"
-      as="section"
-      locale="pt-BR"
-      class="w-full"
-    />
-
-    <div class="flex flex-col gap-2 border-t border-default pt-4">
-      <p class="text-xs font-medium text-muted">
-        Status
-      </p>
-      <label
-        v-for="item in statusItems"
-        :key="item.key"
-        class="flex items-center gap-2 text-sm text-highlighted"
-      >
+  <!--
+    Width/padding live on the parent rail (like template USidebar chrome).
+    This body only fills the rail: min-w-0 + overflow-x-hidden stop the xs
+    UCalendar from spilling past lg:w-64 / mobile w-72.
+  -->
+  <aside class="flex min-h-0 min-w-0 w-full flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto">
+    <UNavigationMenu
+      :items="statusItems"
+      orientation="vertical"
+      class="min-w-0 shrink-0"
+    >
+      <template #status="{ item }">
         <UCheckbox
-          :model-value="statusVisible[item.key]"
-          @update:model-value="(value) => toggleStatus(item.key, Boolean(value))"
+          :label="item.label"
+          :color="item.color"
+          :model-value="statusVisible[item.value as WorkTaskStatus]"
+          class="w-full min-w-0"
+          @update:model-value="toggleStatus(item.value as WorkTaskStatus, $event)"
         />
-        <span
-          class="size-1.5 rounded-full"
-          :class="statusPresentation(item.key).dotClass"
-        />
-        {{ item.label }}
-      </label>
-    </div>
-
-    <UCollapsible v-model:open="filtersOpen" class="border-t border-default pt-2">
-      <template #default="{ open }">
-        <UButton
-          color="neutral"
-          variant="ghost"
-          class="w-full justify-start px-1.5"
-          :trailing-icon="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
-          :aria-label="open ? 'Recolher filtros' : 'Expandir filtros'"
-        >
-          <span class="flex min-w-0 flex-1 items-center gap-2 text-left">
-            <UIcon name="i-lucide-sliders-horizontal" class="size-4 shrink-0 text-muted" />
-            <span>Filtros</span>
-            <UBadge
-              v-if="activeFilterCount"
-              :label="String(activeFilterCount)"
-              color="primary"
-              variant="subtle"
-              size="sm"
-            />
-          </span>
-        </UButton>
       </template>
+    </UNavigationMenu>
+
+    <UCollapsible
+      v-model:open="filtersOpen"
+      class="min-w-0 shrink-0"
+    >
+      <UButton
+        color="neutral"
+        variant="soft"
+        class="w-full min-w-0 justify-start rounded-full"
+        :trailing-icon="filtersOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+        :aria-label="filtersOpen ? 'Recolher filtros' : 'Expandir filtros'"
+      >
+        <span class="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <UIcon name="i-lucide-sliders-horizontal" class="size-4 shrink-0 text-muted" />
+          <span class="truncate">Filtros</span>
+          <UBadge
+            v-if="activeFilterCount"
+            :label="String(activeFilterCount)"
+            color="primary"
+            variant="subtle"
+            size="sm"
+            class="shrink-0"
+          />
+        </span>
+      </UButton>
 
       <template #content>
-        <div class="flex flex-col gap-3 px-1.5 pb-1 pt-3">
+        <div class="flex min-w-0 flex-col gap-3 px-1.5 pb-1 pt-3">
           <UFormField label="Processo">
             <USelectMenu
               :model-value="processId"
@@ -184,12 +190,34 @@ function toggleStatus(key: WorkTaskStatus, on: boolean) {
             color="neutral"
             variant="ghost"
             size="sm"
-            class="self-start px-1.5"
+            class="self-start rounded-full px-1.5"
             :disabled="activeFilterCount === 0"
             @click="emit('clear')"
           />
         </div>
       </template>
     </UCollapsible>
+
+    <!-- Template AppSidebar: separator mt-auto docks mini calendar at the bottom -->
+    <USeparator class="mt-auto shrink-0" />
+
+    <div class="min-w-0 shrink-0 overflow-hidden pb-1">
+      <UCalendar
+        v-model="miniValue"
+        :week-starts-on="1"
+        :year-controls="false"
+        size="xs"
+        fixed-weeks
+        locale="pt-BR"
+        class="w-full max-w-full"
+        :ui="{
+          root: 'w-full max-w-full',
+          header: 'w-full min-w-0',
+          body: 'w-full min-w-0',
+          grid: 'w-full',
+          gridBody: 'w-full'
+        }"
+      />
+    </div>
   </aside>
 </template>

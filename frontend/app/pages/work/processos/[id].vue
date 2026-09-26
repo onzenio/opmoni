@@ -129,9 +129,45 @@ watch(error, (value) => {
       :actions="[{ label: 'Tentar novamente', color: 'error', variant: 'solid', onClick: () => onRefresh() }]"
     />
 
-    <div v-else-if="isLoading && !process" class="flex flex-col gap-3">
-      <USkeleton class="h-32 w-full rounded-xl" />
-      <USkeleton class="h-64 w-full rounded-xl" />
+    <div
+      v-else-if="isLoading && !process"
+      class="flex flex-col gap-3"
+      aria-busy="true"
+      aria-label="Carregando processo"
+    >
+      <UCard variant="subtle" :ui="{ body: 'p-4' }">
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <USkeleton class="h-4 w-48" />
+            <USkeleton class="ms-auto h-5 w-20 rounded-full" />
+          </div>
+          <div class="flex items-center gap-3">
+            <USkeleton class="h-2 flex-1 rounded-full" />
+            <USkeleton class="h-3 w-16" />
+          </div>
+        </div>
+      </UCard>
+
+      <div class="grid min-w-0 gap-3 lg:grid-cols-2">
+        <UCard variant="subtle" :ui="{ body: 'p-4' }">
+          <div class="mb-4 flex items-center gap-2">
+            <USkeleton class="size-4 rounded" />
+            <USkeleton class="h-4 w-16" />
+          </div>
+          <div class="flex flex-col gap-3">
+            <USkeleton v-for="index in 4" :key="index" class="h-10 w-full rounded-lg" />
+          </div>
+        </UCard>
+        <UCard variant="subtle" :ui="{ body: 'p-4' }">
+          <div class="mb-4 flex items-center gap-2">
+            <USkeleton class="size-4 rounded" />
+            <USkeleton class="h-4 w-16" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <USkeleton v-for="index in 5" :key="index" class="h-12 w-full rounded-lg" />
+          </div>
+        </UCard>
+      </div>
     </div>
 
     <template v-else-if="process">

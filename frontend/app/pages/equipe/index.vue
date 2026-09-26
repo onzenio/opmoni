@@ -140,17 +140,17 @@ async function confirmRemove() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div>
     <UPageCard
       title="Membros"
+      description="Convide novos membros por e-mail."
       variant="naked"
       orientation="horizontal"
-      class="mb-0"
+      class="mb-4"
     >
       <UButton
         v-if="canManageMembers"
         label="Convidar"
-        icon="i-lucide-user-plus"
         color="neutral"
         class="w-fit lg:ms-auto"
         :disabled="loading"
@@ -158,71 +158,95 @@ async function confirmRemove() {
       />
     </UPageCard>
 
-    <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
-      <UInput
-        v-model="search"
-        icon="i-lucide-search"
-        placeholder="Buscar por nome ou papel..."
-        class="min-w-0 flex-1"
-        :disabled="loading"
-      />
-      <USelectMenu
-        v-model="departmentFilter"
-        :items="departmentOptions"
-        value-key="value"
-        label-key="label"
-        placeholder="Filtrar por departamento"
-        clear
-        class="w-full sm:w-64"
-        :disabled="loading"
-      />
-    </div>
-
-    <div v-if="loading" class="space-y-2">
-      <USkeleton v-for="index in 5" :key="index" class="h-14 w-full rounded-lg" />
-    </div>
-
-    <UAlert
-      v-else-if="failed || error"
-      color="error"
+    <UPageCard
       variant="subtle"
-      title="Não foi possível carregar a equipe"
-      description="Verifique sua conexão e tente novamente."
-      :actions="[{ label: 'Tentar novamente', color: 'error', variant: 'solid', onClick: () => retry() }]"
-    />
+      :ui="{ container: 'p-0 sm:p-0 gap-y-0', wrapper: 'items-stretch', header: 'p-4 mb-0 border-b border-default' }"
+    >
+      <template #header>
+        <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+          <UInput
+            v-model="search"
+            icon="i-lucide-search"
+            placeholder="Buscar membros"
+            autofocus
+            class="min-w-0 flex-1"
+            :disabled="loading"
+          />
+          <USelectMenu
+            v-model="departmentFilter"
+            :items="departmentOptions"
+            value-key="value"
+            label-key="label"
+            placeholder="Filtrar por departamento"
+            clear
+            class="w-full sm:w-64"
+            :disabled="loading"
+          />
+        </div>
+      </template>
 
-    <template v-else>
-      <UEmpty
-        v-if="!members.length"
-        icon="i-lucide-users"
-        title="Nenhum membro na equipe"
-        description="Os membros da conta aparecem aqui automaticamente."
-        variant="naked"
-        :actions="canManageMembers ? [{ label: 'Convidar', icon: 'i-lucide-user-plus', onClick: openInvite }] : undefined"
-      />
-
-      <UEmpty
-        v-else-if="!visibleMembers.length"
-        icon="i-lucide-search-x"
-        title="Nenhum membro encontrado"
-        description="Ajuste a busca ou limpe o filtro de departamento."
-        variant="naked"
-        :actions="hasActiveFilters ? [{ label: 'Limpar filtros', color: 'neutral', variant: 'outline', onClick: clearFilters }] : undefined"
-      />
-
-      <UPageCard
-        v-else
-        variant="subtle"
-        :ui="{ container: 'p-0 sm:p-0 gap-y-0', wrapper: 'items-stretch' }"
+      <div
+        v-if="loading"
+        class="divide-y divide-default"
+        aria-busy="true"
+        aria-label="Carregando equipe"
       >
+        <div
+          v-for="index in 5"
+          :key="index"
+          class="flex items-center justify-between gap-3 px-4 py-3 sm:px-6"
+        >
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <USkeleton class="size-10 shrink-0 rounded-full" />
+            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <USkeleton class="h-4 w-36 max-w-full" />
+              <USkeleton class="h-3 w-24 max-w-full" />
+            </div>
+          </div>
+          <USkeleton class="hidden h-8 w-28 shrink-0 rounded-md sm:block" />
+        </div>
+      </div>
+
+      <UAlert
+        v-else-if="failed || error"
+        class="m-4"
+        color="error"
+        variant="subtle"
+        title="Não foi possível carregar a equipe"
+        description="Verifique sua conexão e tente novamente."
+        :actions="[{ label: 'Tentar novamente', color: 'error', variant: 'solid', onClick: () => retry() }]"
+      />
+
+      <template v-else>
+        <UEmpty
+          v-if="!members.length"
+          class="py-10"
+          icon="i-lucide-users"
+          title="Nenhum membro na equipe"
+          description="Os membros da conta aparecem aqui automaticamente."
+          variant="naked"
+          :actions="canManageMembers ? [{ label: 'Convidar', onClick: openInvite }] : undefined"
+        />
+
+        <UEmpty
+          v-else-if="!visibleMembers.length"
+          class="py-10"
+          icon="i-lucide-search-x"
+          title="Nenhum membro encontrado"
+          description="Ajuste a busca ou limpe o filtro de departamento."
+          variant="naked"
+          :actions="hasActiveFilters ? [{ label: 'Limpar filtros', color: 'neutral', variant: 'outline', onClick: clearFilters }] : undefined"
+        />
+
         <EquipeMembersList
+          v-else
           :members="visibleMembers"
           :can-manage="canManageMembers"
           @update:role="onRoleUpdate"
           @remove="askRemove"
         />
-      </UPageCard>
-    </template>
+      </template>
+    </UPageCard>
 
     <UModal
       v-if="canManageMembers"

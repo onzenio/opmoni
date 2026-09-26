@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { accessibleDateLabel, calendarPriorityOptions, countActiveCalendarFilters } from '../app/utils/calendarUi.ts'
+import { accessibleDateLabel, calendarPriorityOptions, countActiveCalendarFilters, monthTitleParts } from '../app/utils/calendarUi.ts'
 
 describe('calendar UI helpers', () => {
   it('counts only selected operational filters', () => {
@@ -26,6 +26,13 @@ describe('calendar UI helpers', () => {
       accessibleDateLabel('2026-11-02'),
       'segunda-feira, 2 de novembro de 2026'
     )
+  })
+
+  it('splits month title like the Nuxt calendar template', () => {
+    assert.deepEqual(monthTitleParts('2026-09-25'), {
+      months: 'setembro',
+      year: '2026'
+    })
   })
 
   it('keeps select options compatible with Reka UI', () => {

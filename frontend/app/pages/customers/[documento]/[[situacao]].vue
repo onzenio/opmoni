@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DropdownMenuItem, NavigationMenuItem, TableColumn } from '@nuxt/ui'
 import type { ComponentPublicInstance } from 'vue'
-import { refDebounced, useInfiniteScroll, useMediaQuery } from '@vueuse/core'
+import { refDebounced, useInfiniteScroll } from '@vueuse/core'
 import type { DataTableFilterColumn, DataTableFilterModel, DataTableFilterOperator } from '~/components/data-table/Filter.vue'
 import {
   clientSelectionCount,
@@ -154,7 +154,7 @@ const hideableColumns = [
 ]
 
 const mobileList = useTemplateRef<HTMLElement>('mobileList')
-const desktopTable = useMediaQuery('(min-width: 768px)')
+const desktopTable = useClientMediaQuery('(min-width: 768px)')
 const mobileRowStride = 300
 const mobileViewport = ref(640)
 const mobileWindow = computed(() => {
@@ -630,32 +630,32 @@ const columns = computed<TableColumn<ClientSheet>[]>(() => {
     {
       accessorKey: 'name',
       header: () => sortableHeader('Nome/Razão social', 'name'),
-      meta: { class: { th: 'w-[32%] min-w-0', td: 'max-w-0' } }
+      meta: { class: { th: 'min-w-52 whitespace-nowrap', td: 'max-w-0' } }
     },
     {
       id: 'tags',
       header: 'Tags',
-      meta: { class: { th: 'w-[14%] min-w-0', td: 'max-w-0' } }
+      meta: { class: { th: 'min-w-28 whitespace-nowrap', td: 'max-w-0' } }
     },
     {
       accessorKey: 'tax_regime',
       header: () => sortableHeader('Regime', 'tax_regime'),
-      meta: { class: { th: 'w-[13%] min-w-0', td: 'max-w-0' } }
+      meta: { class: { th: 'min-w-28 whitespace-nowrap', td: 'max-w-0' } }
     },
     {
       accessorKey: 'status',
       header: () => sortableHeader('Situação', 'status'),
-      meta: { class: { th: 'w-[10%] min-w-0', td: 'max-w-0' } }
+      meta: { class: { th: 'min-w-28 whitespace-nowrap', td: 'max-w-0' } }
     },
     {
       id: 'certificate',
       header: () => sortableHeader('Cert. A1', 'certificate'),
-      meta: { class: { th: 'w-[12%] min-w-0', td: 'max-w-0' } }
+      meta: { class: { th: 'min-w-28 whitespace-nowrap', td: 'max-w-0' } }
     },
     {
       id: 'ecac_power_of_attorney',
       header: () => sortableHeader('e-CAC', 'poa'),
-      meta: { class: { th: 'w-[11%] min-w-0', td: 'max-w-0' } }
+      meta: { class: { th: 'min-w-24 whitespace-nowrap', td: 'max-w-0' } }
     },
     {
       id: 'actions',

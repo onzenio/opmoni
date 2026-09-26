@@ -74,5 +74,9 @@ export function useWork() {
     const res = await $api<{ data: WorkGroupedClient[] }>('/work/grouped', { query: { reference_month: referenceMonth } })
     return res.data
   }
-  return { listTemplates, showTemplate, createTemplate, updateTemplate, previewTemplate, generateTemplate, listProcesses, showProcess, listTasks, updateTask, calendar, grouped }
+  async function unscopedTasks(referenceMonth: string) {
+    const res = await $api<{ data: WorkTask[] }>('/work/tasks/unscoped', { query: { reference_month: referenceMonth, include_undated: 1 } })
+    return res.data
+  }
+  return { listTemplates, showTemplate, createTemplate, updateTemplate, previewTemplate, generateTemplate, listProcesses, showProcess, listTasks, updateTask, calendar, grouped, unscopedTasks }
 }

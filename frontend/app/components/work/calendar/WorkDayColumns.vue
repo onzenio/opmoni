@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { WorkTask } from '~/types/work'
 import { accessibleDateLabel } from '~/utils/calendarUi'
-import { parseDateKey, statusPresentation } from '~/utils/workCalendar'
+import { calendarStatusPresentation, parseDateKey } from '~/utils/workCalendar'
 
 defineProps<{
   dayKeys: string[]
@@ -30,15 +30,15 @@ function dayLabel(key: string) {
     class="grid min-h-0 flex-1 gap-px overflow-auto bg-default"
     :class="single ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-7'"
   >
-    <div
+    <section
       v-for="key in dayKeys"
       :key="key"
       class="flex min-h-40 min-w-0 flex-col bg-default"
       :aria-label="accessibleDateLabel(key)"
     >
-      <div class="border-b border-default px-3 py-2 text-sm font-medium first-letter:uppercase text-highlighted">
+      <h2 class="border-b border-default px-3 py-2 text-sm font-medium first-letter:uppercase text-highlighted">
         {{ dayLabel(key) }}
-      </div>
+      </h2>
 
       <div v-if="loading" class="space-y-2 p-3">
         <USkeleton class="h-8 w-full" />
@@ -59,13 +59,13 @@ function dayLabel(key: string) {
           <button
             type="button"
             class="flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-elevated focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
-            :aria-label="`${task.title}, ${statusPresentation(task.status).label}, ${accessibleDateLabel(key)}`"
+            :aria-label="`${task.title}, ${calendarStatusPresentation(task.status).label}, ${accessibleDateLabel(key)}`"
             @click="emit('select', task, $event)"
           >
             <span class="flex min-w-0 items-center gap-1.5 text-sm font-medium text-highlighted">
               <span
                 class="size-1.5 shrink-0 rounded-full"
-                :class="statusPresentation(task.status).dotClass"
+                :class="calendarStatusPresentation(task.status).dotClass"
               />
               <span class="truncate">{{ task.title }}</span>
             </span>
@@ -81,6 +81,6 @@ function dayLabel(key: string) {
           </button>
         </li>
       </ul>
-    </div>
+    </section>
   </div>
 </template>

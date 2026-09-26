@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useMediaQuery } from '@vueuse/core'
 import type { WorkTask } from '~/types/work'
 
 const props = defineProps<{
@@ -19,7 +18,7 @@ const emit = defineEmits<{
   'dismiss': [task: WorkTask, reason: string]
 }>()
 
-const isMobile = useMediaQuery('(max-width: 767px)')
+const isMobile = useClientMediaQuery('(max-width: 767px)')
 const dismissOpen = ref(false)
 const dismissReason = ref('')
 
@@ -48,22 +47,20 @@ function confirmDismiss() {
     :open="open"
     :reference="anchor ?? undefined"
     :content="{ align: 'start', side: 'bottom', sideOffset: 8 }"
-    :ui="{ content: 'overflow-hidden p-0' }"
+    :ui="{ content: 'p-2 w-74' }"
     @update:open="emit('update:open', $event)"
   >
     <template #content>
-      <div class="w-80 max-w-[calc(100vw-2rem)] bg-default">
-        <WorkCalendarTaskDetails
-          :task="task"
-          :can-manage="canManage"
-          :busy="busy"
-          :member-options="memberOptions"
-          @advance="emit('advance', $event)"
-          @back="emit('back', $event)"
-          @assign="(selectedTask, memberId) => emit('assign', selectedTask, memberId)"
-          @request-dismiss="requestDismiss"
-        />
-      </div>
+      <WorkCalendarTaskDetails
+        :task="task"
+        :can-manage="canManage"
+        :busy="busy"
+        :member-options="memberOptions"
+        @advance="emit('advance', $event)"
+        @back="emit('back', $event)"
+        @assign="(selectedTask, memberId) => emit('assign', selectedTask, memberId)"
+        @request-dismiss="requestDismiss"
+      />
     </template>
   </UPopover>
 

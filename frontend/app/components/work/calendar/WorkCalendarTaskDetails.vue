@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { WorkTask } from '~/types/work'
-import { statusPresentation } from '~/utils/workCalendar'
+import { priorityPresentation } from '~/composables/useWorkPresentation'
+import { calendarStatusPresentation } from '~/utils/workCalendar'
 
 const props = defineProps<{
   task: WorkTask
@@ -23,6 +24,15 @@ const canAdvance = computed(() => props.task.status === 'todo' || props.task.sta
 const canBack = computed(() => props.task.status === 'doing' || props.task.status === 'done')
 const canDismiss = computed(() => props.task.status !== 'dismissed')
 
+const status = computed(() => calendarStatusPresentation(props.task.status))
+const priority = computed(() => priorityPresentation(props.task.priority))
+
+const assigneeLabel = computed(() => {
+  if (props.task.assignee_member_id == null) return 'Sem responsável'
+  return props.memberOptions.find(m => m.value === props.task.assignee_member_id)?.label
+    ?? String(props.task.assignee_member_id)
+})
+
 function formatDue(due: string | null) {
   if (!due) return 'Sem prazo'
   return new Date(`${due}T00:00:00`).toLocaleDateString('pt-BR')
@@ -30,99 +40,131 @@ function formatDue(due: string | null) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 p-4">
-    <div class="min-w-0">
-      <h2 v-if="showTitle !== false" class="truncate text-base font-semibold text-highlighted">
-        {{ task.title }}
-      </h2>
-      <p class="mt-1 truncate text-sm text-muted">
-        {{ task.process?.client?.name ?? 'Sem cliente' }} · {{ task.process?.name ?? 'Processo' }}
-      </p>
-    </div>
-
-    <div class="flex flex-wrap items-center gap-2">
+  <div class="flex flex-col gap-2">
+    <!-- Header: title + cliente·processo, status trailing -->
+    <div class="flex items-start gap-2 rounded-md bg-(--control-bg) px-3 py-2">
+      <div class="min-w-0 flex-1">
+        <h2
+          v-if="showTitle !== false"
+          class="truncate text-sm font-medium text-highlighted"
+        >
+          {{ task.title }}
+        </h2>
+        <p
+          class="truncate text-xs text-muted"
+          :class="showTitle !== false ? 'mt-0.5' : ''"
+        >
+          {{ task.process?.client?.name ?? 'Sem cliente' }} · {{ task.process?.name ?? 'Processo' }}
+        </p>
+      </div>
       <UBadge
-        :label="statusPresentation(task.status).label"
-        :color="statusPresentation(task.status).color"
+        :label="status.label"
+        :color="status.color"
         variant="subtle"
+        size="sm"
+        class="shrink-0"
       />
-      <UBadge :label="task.priority" color="neutral" variant="outline" />
     </div>
 
-    <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
-      <dt class="text-muted">
-        Departamento
-      </dt>
-      <dd class="truncate text-right text-highlighted">
-        {{ task.department || '—' }}
-      </dd>
-      <dt class="text-muted">
-        Vencimento
-      </dt>
-      <dd class="text-right text-highlighted">
+    <!-- Meta grid: label | value -->
+    <div class="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5 rounded-md bg-(--control-bg) px-3 py-2">
+      <span class="w-24 text-end text-sm text-muted">Vencimento</span>
+      <span class="truncate text-sm text-highlighted">
         {{ formatDue(task.due_on) }}
-      </dd>
-    </dl>
+      </span>
 
-    <UFormField v-if="canManage" label="Responsável">
+      <span class="w-24 text-end text-sm text-muted">Responsável</span>
       <USelectMenu
+        v-if="canManage"
         :model-value="task.assignee_member_id"
         :items="memberOptions"
         value-key="value"
         label-key="label"
         placeholder="Sem responsável"
         clear
-        class="w-full"
+        size="sm"
+        variant="none"
+        class="w-full min-w-0"
         :disabled="busy"
+        :ui="{ base: 'ps-0 py-0' }"
         @update:model-value="emit('assign', task, ($event as number | null) ?? null)"
       />
-    </UFormField>
-    <p v-else class="text-sm text-muted">
-      Responsável: <span class="text-highlighted">{{ task.assignee_member_id ?? '—' }}</span>
-    </p>
+      <span
+        v-else
+        class="truncate text-sm text-highlighted"
+      >
+        {{ assigneeLabel }}
+      </span>
 
+      <span class="w-24 text-end text-sm text-muted">Departamento</span>
+      <span class="truncate text-sm text-highlighted">
+        {{ task.department || '—' }}
+      </span>
+
+      <span class="w-24 text-end text-sm text-muted">Prioridade</span>
+      <span class="truncate text-sm text-highlighted">
+        {{ priority.label }}
+      </span>
+    </div>
+
+    <!-- Process link as discrete row -->
     <NuxtLink
-      :to="`/work/processos/${task.process?.id}`"
-      class="inline-flex items-center gap-1 text-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      v-if="task.process?.id"
+      :to="`/work/processos/${task.process.id}`"
+      class="inline-flex items-center gap-1.5 rounded-md bg-(--control-bg) px-3 py-2 text-sm text-muted transition-colors hover:bg-(--control-bg-hover) hover:text-highlighted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
-      <UIcon name="i-lucide-external-link" class="size-3.5" />
-      Abrir processo
+      <UIcon name="i-lucide-external-link" class="size-3.5 shrink-0" />
+      <span class="truncate">Abrir processo</span>
     </NuxtLink>
 
-    <div v-if="canManage" class="flex flex-wrap items-center gap-2 border-t border-default pt-3">
+    <!-- Footer actions -->
+    <div
+      v-if="canManage || showClose"
+      class="flex flex-col gap-1.5"
+    >
+      <div
+        v-if="canManage && (canBack || canAdvance)"
+        class="flex flex-wrap items-center gap-1.5"
+      >
+        <UButton
+          v-if="canBack"
+          label="Retornar"
+          color="neutral"
+          variant="outline"
+          size="sm"
+          class="flex-1"
+          :loading="busy"
+          @click="emit('back', task)"
+        />
+        <UButton
+          v-if="canAdvance"
+          :label="task.status === 'todo' ? 'Avançar' : 'Concluir'"
+          color="primary"
+          size="sm"
+          class="flex-1"
+          :loading="busy"
+          @click="emit('advance', task)"
+        />
+      </div>
+
       <UButton
-        v-if="canBack"
-        label="Retornar"
-        color="neutral"
-        variant="outline"
-        size="sm"
-        :loading="busy"
-        @click="emit('back', task)"
-      />
-      <UButton
-        v-if="canAdvance"
-        :label="task.status === 'todo' ? 'Avançar' : 'Concluir'"
-        color="primary"
-        size="sm"
-        :loading="busy"
-        @click="emit('advance', task)"
-      />
-      <UButton
-        v-if="canDismiss"
+        v-if="canManage && canDismiss"
         label="Dispensar"
-        color="neutral"
-        variant="ghost"
+        color="error"
+        variant="soft"
         size="sm"
+        block
         :disabled="busy"
         @click="emit('request-dismiss', task)"
       />
+
       <UButton
         v-if="showClose"
         label="Fechar"
         color="neutral"
-        variant="soft"
+        variant="ghost"
         size="sm"
-        class="ms-auto"
+        block
         @click="emit('close')"
       />
     </div>

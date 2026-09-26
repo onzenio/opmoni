@@ -99,12 +99,19 @@ class WorkTaskTest extends TestCase
             'account_id' => $account->getKey(),
             'status' => 'active',
         ]);
+        $template = ProcessTemplate::factory()->create([
+            'account_id' => $account->getKey(),
+            'name' => 'Fechamento mensal',
+            'cascade' => true,
+        ]);
         $process = Process::factory()->create([
             'account_id' => $account->getKey(),
             'name' => 'Março',
             'client_id' => $client->getKey(),
+            'template_id' => $template->getKey(),
             'reference_month' => '2026-03-01',
             'status' => 'open',
+            'due_on' => '2026-03-20',
         ]);
         Task::factory()->create([
             'account_id' => $account->getKey(),
@@ -123,16 +130,24 @@ class WorkTaskTest extends TestCase
 
         $this->getJson('/api/tasks?status=todo')
             ->assertOk()
-            ->assertJsonCount(2, 'data');
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.process.cascade', true);
 
         $this->getJson('/api/work/calendar?from=2026-03-01&to=2026-03-31')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.title', 'Com data');
+            ->assertJsonPath('data.0.title', 'Com data')
+            ->assertJsonPath('data.0.process.cascade', true);
 
         $this->getJson('/api/work/grouped?reference_month=2026-03')
             ->assertOk()
             ->assertJsonPath('data.0.client.id', $client->getKey())
+            ->assertJsonPath('data.0.processes.0.process.status', 'open')
+            ->assertJsonPath('data.0.processes.0.process.due_on', '2026-03-20')
+            ->assertJsonPath('data.0.processes.0.process.reference_month', '2026-03')
+            ->assertJsonPath('data.0.processes.0.process.template.id', $template->getKey())
+            ->assertJsonPath('data.0.processes.0.process.template.name', 'Fechamento mensal')
+            ->assertJsonPath('data.0.processes.0.process.template.cascade', true)
             ->assertJsonPath('data.0.processes.0.tasks.0.title', 'Com data')
             ->assertJsonPath('data.0.processes.0.totals.tasks', 2)
             ->assertJsonPath('data.0.processes.0.totals.done', 0)
@@ -143,6 +158,111 @@ class WorkTaskTest extends TestCase
             ->assertJsonPath('data.0.processes.0.progress.dismissed', 0)
             ->assertJsonPath('data.0.processes.0.progress.open', 2)
             ->assertJsonPath('data.0.processes.0.ratio', 0);
+    }
+
+    public function test_unscoped_tasks_appear_in_the_month_of_their_due_date(): void
+    {
+        $account = Account::factory()->create();
+        $member = $this->memberOf($account, 'admin');
+        $this->actingAs($member, 'sanctum');
+
+        $unscoped = Process::factory()->create([
+            'account_id' => $account->getKey(),
+            'reference_month' => null,
+        ]);
+        $marchTask = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $unscoped->getKey(),
+            'due_on' => '2026-03-10',
+        ]);
+        Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $unscoped->getKey(),
+            'due_on' => '2026-04-10',
+        ]);
+        $undatedTask = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $unscoped->getKey(),
+            'due_on' => null,
+        ]);
+        $scoped = Process::factory()->create([
+            'account_id' => $account->getKey(),
+            'reference_month' => '2026-03-01',
+        ]);
+        Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $scoped->getKey(),
+            'due_on' => '2026-03-15',
+        ]);
+        $otherAccount = Account::factory()->create();
+        $otherProcess = Process::factory()->create([
+            'account_id' => $otherAccount->getKey(),
+            'reference_month' => null,
+        ]);
+        Task::factory()->create([
+            'account_id' => $otherAccount->getKey(),
+            'process_id' => $otherProcess->getKey(),
+            'due_on' => '2026-03-20',
+        ]);
+
+        $this->getJson('/api/work/tasks/unscoped?reference_month=2026-03')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $marchTask->getKey())
+            ->assertJsonPath('data.0.process.id', $unscoped->getKey())
+            ->assertJsonPath('data.0.process.cascade', false);
+
+        $this->getJson('/api/work/tasks/unscoped?reference_month=2026-03&include_undated=1')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.1.id', $undatedTask->getKey())
+            ->assertJsonPath('data.1.due_on', null);
+
+        $this->getJson('/api/work/tasks/unscoped?reference_month=2026-13')
+            ->assertUnprocessable();
+    }
+
+    public function test_unscoped_task_reports_cascade_lock_from_an_earlier_month(): void
+    {
+        $account = Account::factory()->create();
+        $member = $this->memberOf($account, 'admin');
+        $this->actingAs($member, 'sanctum');
+
+        $template = ProcessTemplate::factory()->create([
+            'account_id' => $account->getKey(),
+            'cascade' => true,
+        ]);
+        $process = Process::factory()->create([
+            'account_id' => $account->getKey(),
+            'template_id' => $template->getKey(),
+            'reference_month' => null,
+        ]);
+        $earlier = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'order' => 1,
+            'status' => 'todo',
+            'due_on' => '2026-08-20',
+        ]);
+        $later = Task::factory()->create([
+            'account_id' => $account->getKey(),
+            'process_id' => $process->getKey(),
+            'order' => 2,
+            'status' => 'todo',
+            'due_on' => '2026-09-20',
+        ]);
+
+        $this->getJson('/api/work/tasks/unscoped?reference_month=2026-09')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $later->getKey())
+            ->assertJsonPath('data.0.cascade_locked', true);
+
+        $earlier->update(['status' => 'done']);
+
+        $this->getJson('/api/work/tasks/unscoped?reference_month=2026-09')
+            ->assertOk()
+            ->assertJsonPath('data.0.cascade_locked', false);
     }
 
     public function test_grouped_totals_align_with_process_progress(): void

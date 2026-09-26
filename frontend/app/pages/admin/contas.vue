@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
+import { adminListParams, createLatestRequestRunner, pageWithinLastPage } from '~/utils/adminListFilters'
 
 definePageMeta({
   middleware: ['auth', 'super-admin']
@@ -46,7 +47,9 @@ const page = ref(1)
 const perPage = 15
 const loading = ref(false)
 const q = ref('')
+const debouncedQ = refDebounced(q, 300)
 const statusFilter = ref<'all' | 'active' | 'suspended'>('all')
+const runLatestLoad = createLatestRequestRunner()
 
 const columns: TableColumn<AdminAccount>[] = [
   { accessorKey: 'id', header: 'ID' },
@@ -57,30 +60,36 @@ const columns: TableColumn<AdminAccount>[] = [
   { id: 'actions' }
 ]
 
-const rows = computed(() => {
-  const term = q.value.trim().toLowerCase()
-  return accountsList.value.filter((account) => {
-    const matchesTerm = !term || account.name.toLowerCase().includes(term) || String(account.id).includes(term)
-    const matchesStatus = statusFilter.value === 'all' || account.status === statusFilter.value
-    return matchesTerm && matchesStatus
-  })
-})
+const listParams = computed(() => adminListParams(page.value, debouncedQ.value, 'status', statusFilter.value))
 
-async function load() {
+function load() {
   loading.value = true
-  try {
-    const res = await $api<Paginated<AdminAccount>>('/admin/accounts', { params: { page: page.value } })
-    accountsList.value = res.data
-    total.value = res.total
-  } catch {
-    toast.add({ title: 'Não foi possível carregar as contas', color: 'error' })
-  } finally {
-    loading.value = false
-  }
+  return runLatestLoad(
+    () => $api<Paginated<AdminAccount>>('/admin/accounts', { params: listParams.value }),
+    {
+      onSuccess: (res) => {
+        accountsList.value = res.data
+        total.value = res.total
+        page.value = pageWithinLastPage(page.value, res.last_page)
+      },
+      onError: () => toast.add({ title: 'Não foi possível carregar as contas', color: 'error' }),
+      onSettled: () => {
+        loading.value = false
+      }
+    }
+  )
 }
 
 onMounted(load)
 watch(page, load)
+watch([debouncedQ, statusFilter], () => {
+  if (page.value !== 1) {
+    page.value = 1
+    return
+  }
+
+  void load()
+})
 
 function isOwnAccount(id: number) {
   return accounts.value.some(a => a.id === id)
@@ -260,7 +269,7 @@ async function onRename(event: FormSubmitEvent<RenameSchema>) {
 
       <div class="flex flex-col gap-4 p-4 sm:p-6">
         <UTable
-          :data="rows"
+          :data="accountsList"
           :columns="columns"
           :loading="loading"
           class="shrink-0"
@@ -315,7 +324,7 @@ async function onRename(event: FormSubmitEvent<RenameSchema>) {
 
         <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
           <div class="text-sm text-muted">
-            {{ rows.length }} de {{ total }} conta(s)
+            {{ accountsList.length }} de {{ total }} conta(s)
           </div>
 
           <div class="flex items-center gap-1.5">

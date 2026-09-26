@@ -25,6 +25,7 @@ class ProcessResource extends JsonResource
             'template' => $this->whenLoaded('template', fn () => $this->template === null ? null : [
                 'id' => $this->template->getKey(),
                 'name' => $this->template->name,
+                'cascade' => (bool) $this->template->cascade,
             ]),
             'client' => $this->whenLoaded('client', fn () => $this->client === null ? null : [
                 'id' => $this->client->getKey(),

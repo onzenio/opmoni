@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
+import { adminPages, adminSidebarChildren } from '~/utils/adminNav'
 import { equipeSidebarChildren } from '~/utils/equipeNav'
 import { monitoringSidebarChildren } from '~/utils/monitoringNav'
 import { workSidebarChildren } from '~/utils/workNav'
@@ -163,41 +164,16 @@ const navLinks = computed<NavigationMenuItem[][]>(() => {
     return item
   })
   if (isSuperAdmin.value) {
-    const close = () => {
-      open.value = false
-    }
     main.push({
       label: 'Admin',
       icon: 'i-lucide-shield-check',
       to: '/admin',
-      defaultOpen: true,
+      defaultOpen: route.path.startsWith('/admin'),
       type: 'trigger',
-      children: [{
-        label: 'Resumo',
-        to: '/admin',
-        exact: true,
+      children: adminSidebarChildren(route.path).map(child => ({
+        ...child,
         onSelect: close
-      }, {
-        label: 'Contas',
-        to: '/admin/contas',
-        onSelect: close
-      }, {
-        label: 'Planos',
-        to: '/admin/planos',
-        onSelect: close
-      }, {
-        label: 'Assinaturas',
-        to: '/admin/assinaturas',
-        onSelect: close
-      }, {
-        label: 'Usuários',
-        to: '/admin/usuarios',
-        onSelect: close
-      }, {
-        label: 'Suporte',
-        to: '/admin/suporte',
-        onSelect: close
-      }]
+      }))
     })
   }
   return [main, links[1] ?? []]
@@ -206,7 +182,7 @@ const navLinks = computed<NavigationMenuItem[][]>(() => {
 const groups = computed(() => [{
   id: 'links',
   label: 'Go to',
-  items: links.flat()
+  items: [...links.flat(), ...(isSuperAdmin.value ? adminPages : [])]
 }, {
   id: 'code',
   label: 'Code',

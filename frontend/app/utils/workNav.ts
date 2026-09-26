@@ -14,14 +14,9 @@ export const workNav: readonly WorkNavItem[] = [
   { label: 'Modelos', icon: 'i-lucide-shapes', to: '/work/modelos' }
 ]
 
-export function isCalendarRoute(path: string) {
-  return path.split('?')[0] === '/work/calendario'
-}
-
 export function workSidebarChildren(path: string): NavigationMenuItem[] {
   return workNav.map(item => ({
     label: item.label,
-    icon: item.icon,
     to: item.to,
     active: path === item.to || path.startsWith(`${item.to}/`)
   }))

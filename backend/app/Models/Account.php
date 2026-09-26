@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\LiteralSearch;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -25,6 +27,28 @@ class Account extends Model
         return [
             'settings' => 'array',
         ];
+    }
+
+    public function scopeSearch(Builder $query, ?string $term): Builder
+    {
+        $term = trim((string) $term);
+
+        if ($term === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $accounts) use ($term): void {
+            LiteralSearch::whereContains($accounts, 'name', $term);
+
+            if (ctype_digit($term)) {
+                $accounts->orWhereKey((int) $term);
+            }
+        });
+    }
+
+    public function scopeWithStatus(Builder $query, ?string $status): Builder
+    {
+        return $status === null ? $query : $query->where('status', $status);
     }
 
     public function members(): BelongsToMany

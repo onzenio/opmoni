@@ -319,9 +319,49 @@ async function onGenerate() {
       :actions="[{ label: 'Tentar novamente', color: 'error', variant: 'solid', onClick: () => load() }]"
     />
 
-    <div v-else-if="loading" class="flex flex-col gap-3">
-      <USkeleton class="h-12 w-full rounded-xl" />
-      <USkeleton class="h-64 w-full rounded-xl" />
+    <div
+      v-else-if="loading"
+      class="flex flex-col gap-3"
+      aria-busy="true"
+      aria-label="Carregando modelo"
+    >
+      <UCard variant="subtle" :ui="{ body: 'p-3 sm:p-4' }">
+        <div class="grid min-w-0 gap-2 sm:grid-cols-2">
+          <div class="flex flex-col gap-1.5">
+            <USkeleton class="h-3 w-14" />
+            <USkeleton class="h-9 w-full rounded-md" />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <USkeleton class="h-3 w-20" />
+            <USkeleton class="h-9 w-full rounded-md" />
+          </div>
+        </div>
+      </UCard>
+
+      <div class="flex gap-4 border-b border-default pb-2">
+        <USkeleton v-for="index in 4" :key="index" class="h-4 w-20" />
+      </div>
+
+      <UCard variant="subtle" :ui="{ body: 'p-4' }">
+        <div class="flex flex-col gap-3">
+          <div class="flex flex-col gap-1.5">
+            <USkeleton class="h-3 w-16" />
+            <USkeleton class="h-9 w-full rounded-md" />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <USkeleton class="h-3 w-24" />
+            <USkeleton class="h-9 w-full rounded-md" />
+          </div>
+          <div class="flex items-center gap-3">
+            <USkeleton class="h-5 w-10 rounded-full" />
+            <USkeleton class="h-3 w-20" />
+          </div>
+          <div class="flex items-center gap-3">
+            <USkeleton class="h-5 w-10 rounded-full" />
+            <USkeleton class="h-3 w-28" />
+          </div>
+        </div>
+      </UCard>
     </div>
 
     <template v-else>

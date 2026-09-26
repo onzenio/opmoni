@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\IndexAccountRequest;
 use App\Http\Resources\AccountResource;
 use App\Models\Account;
 use Illuminate\Http\JsonResponse;
@@ -12,12 +13,16 @@ use Illuminate\Support\Facades\Gate;
 
 class AccountController extends Controller
 {
-    public function index(): AnonymousResourceCollection
+    public function index(IndexAccountRequest $request): AnonymousResourceCollection
     {
+        $filters = $request->validated();
         $accounts = Account::with('subscription.plan')
             ->withCount('members')
+            ->search($filters['q'] ?? null)
+            ->withStatus($filters['status'] ?? null)
             ->orderByDesc('id')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         return AccountResource::collection($accounts);
     }

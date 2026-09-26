@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Support\LiteralSearch;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -36,6 +38,30 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
         ];
+    }
+
+    public function scopeSearch(Builder $query, ?string $term): Builder
+    {
+        $term = trim((string) $term);
+
+        if ($term === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $users) use ($term): void {
+            $users
+                ->where(fn (Builder $users): Builder => LiteralSearch::whereContains($users, 'name', $term))
+                ->orWhere(fn (Builder $users): Builder => LiteralSearch::whereContains($users, 'email', $term));
+        });
+    }
+
+    public function scopeWithAdminType(Builder $query, ?string $type): Builder
+    {
+        return match ($type) {
+            'super' => $query->where('is_super_admin', true),
+            'user' => $query->where('is_super_admin', false),
+            default => $query,
+        };
     }
 
     public function isSuperAdmin(): bool

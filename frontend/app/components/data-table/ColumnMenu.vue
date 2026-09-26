@@ -6,7 +6,7 @@ const props = defineProps<{
 }>()
 
 const visibility = defineModel<Record<string, boolean>>({ required: true })
-const wide = useMediaQuery('(min-width: 768px)')
+const wide = useClientMediaQuery('(min-width: 768px)')
 
 const items = computed<DropdownMenuItem[][]>(() => [props.columns.map(column => ({
   label: column.label,

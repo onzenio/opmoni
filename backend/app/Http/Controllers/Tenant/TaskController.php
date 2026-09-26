@@ -37,7 +37,7 @@ class TaskController extends Controller
         $this->ensureDepartmentExists($filters['department'] ?? null);
 
         $tasks = Task::query()
-            ->with(['process.client'])
+            ->with(['process.client', 'process.template'])
             ->ofProcess(isset($filters['process_id']) ? (int) $filters['process_id'] : null)
             ->ofClient(isset($filters['client_id']) ? (int) $filters['client_id'] : null)
             ->withStatus($filters['status'] ?? null)
@@ -56,7 +56,7 @@ class TaskController extends Controller
     {
         Gate::authorize('view', $task);
 
-        return new TaskResource($task->load('process.client'));
+        return new TaskResource($task->load(['process.client', 'process.template']));
     }
 
     public function update(UpdateTaskRequest $request, Task $task): TaskResource
@@ -111,7 +111,7 @@ class TaskController extends Controller
 
         SupportAudit::logWrite($request, 'tasks', 'update', $task->getKey(), ['status' => $to]);
 
-        return new TaskResource($task->load('process.client'));
+        return new TaskResource($task->load(['process.client', 'process.template']));
     }
 
     public function calendar(Request $request): AnonymousResourceCollection
@@ -135,7 +135,7 @@ class TaskController extends Controller
         // bound de data pura cortaria o último dia se due_on tiver horário.
         return TaskResource::collection($this->filteredQuery($filters)
             ->limit(2000)
-            ->with('process.client')
+            ->with(['process.client', 'process.template'])
             ->get());
     }
 
@@ -150,7 +150,7 @@ class TaskController extends Controller
         $month = Carbon::createFromFormat('Y-m', $filters['reference_month'])->startOfMonth();
 
         $processes = Process::query()
-            ->with(['client', 'tasks' => fn ($query) => $query->ordered()])
+            ->with(['client', 'template', 'tasks' => fn ($query) => $query->ordered()])
             ->whereDate('reference_month', $month->toDateString())
             ->orderBy('name')
             ->get();
@@ -172,7 +172,19 @@ class TaskController extends Controller
             $progress = $this->progressTotals($process->tasks);
 
             $processEntry = [
-                'process' => ['id' => $process->getKey(), 'name' => $process->name],
+                'process' => [
+                    'id' => $process->getKey(),
+                    'name' => $process->name,
+                    'status' => $this->processStatus($process),
+                    'due_on' => $process->due_on?->toDateString(),
+                    'reference_month' => $process->reference_month?->format('Y-m'),
+                    'cascade' => (bool) ($process->template?->cascade ?? false),
+                    'template' => $process->template === null ? null : [
+                        'id' => $process->template->getKey(),
+                        'name' => $process->template->name,
+                        'cascade' => (bool) $process->template->cascade,
+                    ],
+                ],
                 'totals' => ['tasks' => $progress['total'], 'done' => $progress['done'], 'dismissed' => $progress['dismissed'], 'open' => $progress['open']],
                 'progress' => $progress,
                 'ratio' => $progress['ratio'],
@@ -185,6 +197,33 @@ class TaskController extends Controller
         }
 
         return response()->json(['data' => array_values($clients)]);
+    }
+
+    public function unscopedForMonth(Request $request): AnonymousResourceCollection
+    {
+        Gate::authorize('viewAny', Task::class);
+
+        $filters = $request->validate([
+            'reference_month' => ['required', 'date_format:Y-m'],
+            'include_undated' => ['sometimes', 'boolean'],
+        ]);
+
+        $month = Carbon::createFromFormat('Y-m', $filters['reference_month'])->startOfMonth();
+        $includeUndated = (bool) ($filters['include_undated'] ?? false);
+
+        return TaskResource::collection(Task::query()
+            ->select('tasks.*')
+            ->selectRaw('EXISTS (SELECT 1 FROM tasks AS prior WHERE prior.account_id = tasks.account_id AND prior.process_id = tasks.process_id AND prior."order" < tasks."order" AND prior.status NOT IN (?, ?)) AS cascade_locked', [TaskStatus::Done->value, TaskStatus::Dismissed->value])
+            ->whereHas('process', fn (Builder $processes): Builder => $processes->whereNull('reference_month'))
+            ->where(function (Builder $tasks) use ($month, $includeUndated): void {
+                $tasks->withDueRange($month->toDateString(), $month->copy()->endOfMonth()->toDateString());
+                if ($includeUndated) {
+                    $tasks->orWhereNull('due_on');
+                }
+            })
+            ->with(['process.client', 'process.template'])
+            ->ordered()
+            ->get());
     }
 
     /**
@@ -226,7 +265,7 @@ class TaskController extends Controller
     private function filteredQuery(array $filters): Builder
     {
         return Task::query()
-            ->with(['process.client'])
+            ->with(['process.client', 'process.template'])
             ->whereNotNull('due_on')
             ->whereDate('due_on', '>=', $filters['from'])
             ->whereDate('due_on', '<=', $filters['to'])
@@ -242,6 +281,11 @@ class TaskController extends Controller
     private function taskStatus(Task $task): string
     {
         return $task->status instanceof TaskStatus ? $task->status->value : (string) $task->status;
+    }
+
+    private function processStatus(Process $process): string
+    {
+        return $process->status instanceof \BackedEnum ? $process->status->value : (string) $process->status;
     }
 
     private function ensureDepartmentExists(?string $department): void

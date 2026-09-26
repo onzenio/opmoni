@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkToolbarTeleport from '~/components/work/WorkToolbarTeleport'
 import type { WorkTemplate } from '~/types/work'
 import { taxRegimeLabel } from '~/utils/portfolioLabels'
 import type { TaxRegime } from '~/types/client'
@@ -60,30 +61,28 @@ watch(error, (value) => {
 
 <template>
   <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-3 sm:gap-5 sm:p-4 lg:p-5">
-    <header class="flex min-w-0 flex-wrap items-center gap-2">
-      <div class="flex min-w-0 flex-1 items-center gap-2.5">
-        <UIcon name="i-lucide-shapes" class="size-5 shrink-0 text-primary" />
-        <h2 class="truncate text-base font-semibold tracking-tight text-highlighted sm:text-lg">
-          Modelos
-        </h2>
-      </div>
-      <UButton
-        v-if="canManageWork"
-        label="Novo modelo"
-        icon="i-lucide-plus"
-        color="primary"
-        size="sm"
-        to="/work/modelos/novo"
-      />
-      <UButton
-        icon="i-lucide-refresh-cw"
-        color="neutral"
-        variant="ghost"
-        aria-label="Atualizar modelos"
-        :loading="isLoading"
-        @click="onRefresh"
-      />
-    </header>
+    <ClientOnly>
+      <WorkToolbarTeleport>
+        <div class="flex items-center gap-1">
+          <UButton
+            v-if="canManageWork"
+            label="Novo modelo"
+            icon="i-lucide-plus"
+            color="primary"
+            size="sm"
+            to="/work/modelos/novo"
+          />
+          <UButton
+            icon="i-lucide-refresh-cw"
+            color="neutral"
+            variant="ghost"
+            aria-label="Atualizar modelos"
+            :loading="isLoading"
+            @click="onRefresh"
+          />
+        </div>
+      </WorkToolbarTeleport>
+    </ClientOnly>
 
     <UAlert
       v-if="error"
@@ -95,9 +94,12 @@ watch(error, (value) => {
       :actions="[{ label: 'Tentar novamente', color: 'error', variant: 'solid', onClick: () => onRefresh() }]"
     />
 
-    <div v-else-if="isLoading && templates.length === 0" class="flex flex-col gap-3">
-      <USkeleton v-for="index in 4" :key="index" class="h-24 w-full rounded-xl" />
-    </div>
+    <WorkTableSkeleton
+      v-else-if="isLoading && templates.length === 0"
+      :columns="6"
+      :rows="6"
+      :grouped="false"
+    />
 
     <UEmpty
       v-else-if="templates.length === 0"

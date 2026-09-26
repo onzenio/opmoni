@@ -3,10 +3,10 @@ import type { WorkTask, WorkTaskPriority, WorkTaskStatus } from '~/types/work'
 import { useClients } from '~/composables/useClients'
 import { useDepartments } from '~/composables/useDepartments'
 import { useMembers } from '~/composables/useMembers'
+import { monthTitleParts } from '~/utils/calendarUi'
 import {
   type CalendarView,
   groupTasksByDay,
-  monthLabel,
   parseCalendarQuery,
   periodRange,
   shiftPeriod,
@@ -72,17 +72,28 @@ const filteredTasks = computed(() => tasks.value.filter(task => statusVisible.va
 const tasksByDay = computed(() => groupTasksByDay(filteredTasks.value))
 
 const title = computed(() => {
-  if (view.value === 'month') return monthLabel(focusDate.value)
+  if (view.value === 'month') return monthTitleParts(focusDate.value)
   if (view.value === 'week') {
     const keys = weekKeys(focusDate.value)
-    return `Semana · ${keys[0]} → ${keys[6]}`
+    const start = monthTitleParts(keys[0]!)
+    const end = monthTitleParts(keys[6]!)
+    if (start.months === end.months && start.year === end.year) {
+      return { months: `${keys[0]!.slice(8)}–${keys[6]!.slice(8)} ${start.months}`, year: start.year }
+    }
+    return { months: `${keys[0]} → ${keys[6]}`, year: end.year }
   }
-  return new Date(`${focusDate.value}T00:00:00`).toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  })
+  const date = new Date(`${focusDate.value}T00:00:00`)
+  return {
+    months: date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }),
+    year: String(date.getFullYear())
+  }
+})
+
+const isSidebarOpen = ref(false)
+const isMobile = useClientMediaQuery('(max-width: 1023px)')
+
+watch([view, focusDate], () => {
+  if (isMobile.value) isSidebarOpen.value = false
 })
 
 const dayColumnKeys = computed(() => {
@@ -357,60 +368,38 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-    <header class="flex min-w-0 flex-wrap items-center gap-3 border-b border-default px-4 py-3 sm:px-5 lg:px-6">
-      <div class="min-w-0 flex-1">
-        <h1 class="truncate text-xl font-semibold tracking-tight text-highlighted first-letter:uppercase sm:text-2xl">
-          {{ title }}
-        </h1>
-      </div>
+  <!-- Shell composition ported from nuxt-ui-templates/calendar `pages/[view]/[date].vue` -->
+  <div class="isolate relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
+    <div
+      v-if="isSidebarOpen"
+      class="fixed inset-0 z-40 bg-black/40 lg:hidden"
+      @click="isSidebarOpen = false"
+    />
 
-      <UTabs
-        :model-value="view"
-        :items="viewItems"
-        :content="false"
-        size="sm"
-        class="order-3 w-full sm:order-none sm:w-auto"
-        @update:model-value="(value) => { view = value as CalendarView }"
-      />
-
-      <div class="flex shrink-0 items-center gap-1">
+    <!--
+      Rail owns width + padding (template USidebar chrome). Do not also set
+      lg:w-64 on WorkCalendarSidebar — that double-width was spilling the mini calendar.
+    -->
+    <div
+      class="z-50 flex min-h-0 min-w-0 shrink-0 flex-col self-stretch border-e border-default bg-default transition-transform lg:relative lg:z-0 lg:w-64 lg:max-w-64 lg:translate-x-0 lg:shadow-none"
+      :class="isSidebarOpen
+        ? 'fixed inset-y-0 start-0 w-72 max-w-[85vw] translate-x-0 p-2 pe-px shadow-2xl'
+        : 'fixed inset-y-0 start-0 w-72 max-w-[85vw] -translate-x-full p-2 pe-px pointer-events-none lg:pointer-events-auto lg:max-w-64'"
+    >
+      <div class="mb-2 flex shrink-0 items-center justify-end lg:hidden">
         <UButton
-          icon="i-lucide-chevron-left"
-          color="neutral"
-          variant="ghost"
-          aria-label="Período anterior"
-          :disabled="isLoading"
-          @click="goPrev"
-        />
-        <UButton
-          label="Hoje"
+          icon="i-lucide-x"
           color="neutral"
           variant="soft"
-          :disabled="isLoading"
-          @click="goToday"
-        />
-        <UButton
-          icon="i-lucide-chevron-right"
-          color="neutral"
-          variant="ghost"
-          aria-label="Próximo período"
-          :disabled="isLoading"
-          @click="goNext"
-        />
-        <UButton
-          icon="i-lucide-refresh-cw"
-          color="neutral"
-          variant="ghost"
-          aria-label="Atualizar calendário"
-          :loading="isLoading"
-          @click="onRefresh"
+          size="sm"
+          aria-label="Fechar menu"
+          class="rounded-full"
+          @click="isSidebarOpen = false"
         />
       </div>
-    </header>
 
-    <div class="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row lg:px-5 lg:py-4 xl:px-6">
       <WorkCalendarSidebar
+        class="min-h-0 min-w-0 flex-1"
         :model-date="focusDate"
         :status-visible="statusVisible"
         :process-id="processId"
@@ -431,11 +420,102 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         @update:priority="priority = $event"
         @clear="clearFilters"
       />
+    </div>
 
-      <main class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:ps-5">
+    <div class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden -z-1">
+      <header class="absolute top-0 inset-x-0 z-10 flex items-center gap-2 sm:gap-4 h-[calc(var(--ui-header-height)+0.5rem)] px-4 pt-2 border-b border-default glass-material [view-transition-name:header]">
+        <div class="pointer-events-none absolute inset-0 -z-10 bg-(--glass-bg) bg-linear-to-b from-default from-40% to-transparent" />
+
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <UButton
+            icon="i-lucide-menu"
+            color="neutral"
+            variant="soft"
+            size="sm"
+            aria-label="Abrir menu"
+            class="lg:hidden shrink-0 rounded-full"
+            @click="isSidebarOpen = true"
+          />
+
+          <h1 class="flex min-w-0 flex-1 items-baseline gap-1.5 text-xl tracking-tight sm:text-2xl">
+            <span class="truncate font-bold text-highlighted first-letter:uppercase">{{ title.months }}</span>
+            <span class="font-normal text-muted">{{ title.year }}</span>
+          </h1>
+        </div>
+
+        <UTabs
+          :model-value="view"
+          :items="viewItems"
+          :content="false"
+          color="neutral"
+          size="sm"
+          class="mx-auto w-20 sm:w-42 lg:w-48"
+          :ui="{ trigger: 'p-1 lg:p-1.5' }"
+          @update:model-value="(value) => { view = value as CalendarView }"
+        >
+          <template #default="{ item }">
+            <span class="sm:hidden">{{ item.label.charAt(0) }}</span>
+            <span class="hidden sm:inline">{{ item.label }}</span>
+          </template>
+        </UTabs>
+
+        <div class="flex items-center justify-end gap-2 md:flex-1">
+          <div class="flex items-center gap-1">
+            <UTooltip text="Anterior" :kbds="['arrowleft']">
+              <UButton
+                icon="i-lucide-chevron-left"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                aria-label="Período anterior"
+                class="rounded-full"
+                :disabled="isLoading"
+                @click="goPrev"
+              />
+            </UTooltip>
+            <UTooltip text="Hoje" :kbds="['t']">
+              <UButton
+                label="Hoje"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                class="hidden rounded-full sm:inline-flex"
+                :disabled="isLoading"
+                @click="goToday"
+              />
+            </UTooltip>
+            <UTooltip text="Próximo" :kbds="['arrowright']">
+              <UButton
+                icon="i-lucide-chevron-right"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                aria-label="Próximo período"
+                class="rounded-full"
+                :disabled="isLoading"
+                @click="goNext"
+              />
+            </UTooltip>
+            <UTooltip text="Atualizar">
+              <UButton
+                icon="i-lucide-refresh-cw"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                aria-label="Atualizar calendário"
+                class="rounded-full"
+                :loading="isLoading"
+                @click="onRefresh"
+              />
+            </UTooltip>
+          </div>
+        </div>
+      </header>
+
+      <div class="flex min-h-0 flex-1 flex-col">
         <UAlert
           v-if="error"
-          class="m-3 lg:m-0 lg:mb-4"
+          class="relative z-20 m-3 mt-[calc(var(--ui-header-height,4rem)+1rem)]"
           color="error"
           variant="subtle"
           title="Não foi possível carregar o calendário"
@@ -472,7 +552,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           :single="view === 'day'"
           @select="openTask"
         />
-      </main>
+      </div>
     </div>
 
     <WorkCalendarTaskPopover

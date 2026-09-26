@@ -71,6 +71,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::apiResource('tasks', TaskController::class)->only(['index', 'show', 'update']);
     Route::get('work/calendar', [TaskController::class, 'calendar']);
     Route::get('work/grouped', [TaskController::class, 'grouped']);
+    Route::get('work/tasks/unscoped', [TaskController::class, 'unscopedForMonth']);
     Route::apiResource('account/members', AccountMemberController::class)->parameter('members', 'member');
 });
 

@@ -28,9 +28,16 @@ class TaskResource extends JsonResource
             'completed_at' => $this->completed_at?->toDateTimeString(),
             'dismissal_reason' => $this->dismissal_reason,
             'order' => $this->order,
+            'cascade_locked' => $this->when(
+                $this->resource->getAttribute('cascade_locked') !== null,
+                fn (): bool => (bool) ($this->process?->template?->cascade ?? false) && (bool) $this->cascade_locked
+            ),
             'process' => $this->whenLoaded('process', fn () => [
                 'id' => $this->process->getKey(),
                 'name' => $this->process->name,
+                'cascade' => $this->process->relationLoaded('template')
+                    ? (bool) ($this->process->template?->cascade ?? false)
+                    : null,
                 'client' => $this->process->relationLoaded('client') && $this->process->client !== null ? [
                     'id' => $this->process->client->getKey(),
                     'name' => $this->process->client->name,

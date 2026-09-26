@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { isCalendarRoute } from '../app/utils/workNav.ts'
+import { workSidebarChildren } from '../app/utils/workNav.ts'
 
 describe('Work navigation', () => {
-  it('identifies only the calendar route for the clean shell', () => {
-    assert.equal(isCalendarRoute('/work/calendario'), true)
-    assert.equal(isCalendarRoute('/work/calendario?view=month'), true)
-    assert.equal(isCalendarRoute('/work/tarefas'), false)
-    assert.equal(isCalendarRoute('/work/calendario-extra'), false)
+  it('marks the active Work child in sidebar children', () => {
+    const items = workSidebarChildren('/work/calendario')
+    const calendar = items.find(item => item.to === '/work/calendario')
+    const tarefas = items.find(item => item.to === '/work/tarefas')
+
+    assert.equal(calendar?.active, true)
+    assert.equal(tarefas?.active, false)
   })
 })

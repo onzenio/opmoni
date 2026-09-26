@@ -42,7 +42,7 @@ const open = ref(false)
 const query = ref('')
 const paletteKey = ref(0)
 const operatorPref = ref<Record<string, DataTableFilterOperator>>({})
-const isMobile = useMediaQuery('(max-width: 767px)')
+const isMobile = useClientMediaQuery('(max-width: 767px)')
 
 function applied(columnId: string) {
   return props.modelValue.find(filter => filter.columnId === columnId)

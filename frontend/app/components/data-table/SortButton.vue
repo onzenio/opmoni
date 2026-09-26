@@ -19,8 +19,8 @@ const icon = computed(() => {
     variant="ghost"
     :label="label"
     :icon="icon"
-    class="-mx-1.5 min-w-0 max-w-full shrink"
-    :ui="{ label: 'truncate' }"
+    class="-mx-1.5 shrink-0 whitespace-nowrap"
+    :ui="{ label: 'whitespace-nowrap' }"
     @click="emit('toggle')"
   />
 </template>

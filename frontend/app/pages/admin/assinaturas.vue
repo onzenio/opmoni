@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
+import { adminListParams, createLatestRequestRunner, pageWithinLastPage } from '~/utils/adminListFilters'
 
 definePageMeta({
   middleware: ['auth', 'super-admin']
@@ -52,7 +53,9 @@ const page = ref(1)
 const perPage = 15
 const loading = ref(false)
 const q = ref('')
+const debouncedQ = refDebounced(q, 300)
 const statusFilter = ref<'all' | AdminSubscription['status']>('all')
+const runLatestLoad = createLatestRequestRunner()
 
 const columns: TableColumn<AdminSubscription>[] = [
   { accessorKey: 'id', header: 'ID' },
@@ -62,36 +65,40 @@ const columns: TableColumn<AdminSubscription>[] = [
   { id: 'actions' }
 ]
 
-const rows = computed(() => {
-  const term = q.value.trim().toLowerCase()
-  return subscriptions.value.filter((subscription) => {
-    const accountName = subscription.account?.name?.toLowerCase() ?? ''
-    const planName = subscription.plan?.name?.toLowerCase() ?? ''
-    const matchesTerm = !term || accountName.includes(term) || planName.includes(term) || String(subscription.id).includes(term)
-    const matchesStatus = statusFilter.value === 'all' || subscription.status === statusFilter.value
-    return matchesTerm && matchesStatus
-  })
-})
+const listParams = computed(() => adminListParams(page.value, debouncedQ.value, 'status', statusFilter.value))
 
-async function load() {
+function load() {
   loading.value = true
-  try {
-    const [subs, planList] = await Promise.all([
-      $api<Paginated<AdminSubscription>>('/admin/subscriptions', { params: { page: page.value } }),
+  return runLatestLoad(
+    () => Promise.all([
+      $api<Paginated<AdminSubscription>>('/admin/subscriptions', { params: listParams.value }),
       plans.value.length ? Promise.resolve(null) : $api<AdminPlan[]>('/admin/plans')
-    ])
-    subscriptions.value = subs.data
-    total.value = subs.total
-    if (planList) plans.value = planList
-  } catch {
-    toast.add({ title: 'Não foi possível carregar as assinaturas', color: 'error' })
-  } finally {
-    loading.value = false
-  }
+    ]),
+    {
+      onSuccess: ([subs, planList]) => {
+        subscriptions.value = subs.data
+        total.value = subs.total
+        page.value = pageWithinLastPage(page.value, subs.last_page)
+        if (planList) plans.value = planList
+      },
+      onError: () => toast.add({ title: 'Não foi possível carregar as assinaturas', color: 'error' }),
+      onSettled: () => {
+        loading.value = false
+      }
+    }
+  )
 }
 
 onMounted(load)
 watch(page, load)
+watch([debouncedQ, statusFilter], () => {
+  if (page.value !== 1) {
+    page.value = 1
+    return
+  }
+
+  void load()
+})
 
 const editOpen = ref(false)
 const editSchema = z.object({
@@ -180,7 +187,7 @@ async function onSave(event: FormSubmitEvent<EditSchema>) {
 
       <div class="flex flex-col gap-4 p-4 sm:p-6">
         <UTable
-          :data="rows"
+          :data="subscriptions"
           :columns="columns"
           :loading="loading"
           class="shrink-0"
@@ -228,7 +235,7 @@ async function onSave(event: FormSubmitEvent<EditSchema>) {
 
         <div class="flex items-center justify-between gap-3 border-t border-default pt-4">
           <div class="text-sm text-muted">
-            {{ rows.length }} de {{ total }} assinatura(s)
+            {{ subscriptions.length }} de {{ total }} assinatura(s)
           </div>
 
           <div class="flex items-center gap-1.5">

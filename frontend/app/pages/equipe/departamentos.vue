@@ -172,19 +172,18 @@ async function confirmDelete() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div>
     <UPageCard
       title="Departamentos"
-      description="Organize a equipe em áreas como Fiscal e Pessoal para o Work."
+      description="Agrupe a equipe por área."
       variant="naked"
       orientation="horizontal"
-      class="mb-0"
+      class="mb-4"
     >
       <UButton
         v-if="canManageDepartments"
         label="Novo departamento"
-        icon="i-lucide-plus"
-        color="primary"
+        color="neutral"
         class="w-fit lg:ms-auto"
         :disabled="loading"
         @click="openCreate"
@@ -205,8 +204,26 @@ async function confirmDelete() {
         />
       </template>
 
-      <div v-if="loading" class="space-y-2 p-4">
-        <USkeleton v-for="index in 4" :key="index" class="h-14 w-full rounded-lg" />
+      <div
+        v-if="loading"
+        class="divide-y divide-default"
+        aria-busy="true"
+        aria-label="Carregando departamentos"
+      >
+        <div
+          v-for="index in 4"
+          :key="index"
+          class="flex items-center justify-between gap-3 px-4 py-3 sm:px-6"
+        >
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <USkeleton class="h-6 w-28 rounded-full" />
+            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <USkeleton class="h-3 w-24" />
+              <USkeleton class="h-6 w-20 rounded-full" />
+            </div>
+          </div>
+          <USkeleton class="size-8 shrink-0 rounded-md" />
+        </div>
       </div>
 
       <UAlert
@@ -227,7 +244,7 @@ async function confirmDelete() {
           title="Nenhum departamento"
           description="Crie o primeiro departamento para organizar a equipe."
           variant="naked"
-          :actions="canManageDepartments ? [{ label: 'Criar departamento', icon: 'i-lucide-plus', onClick: openCreate }] : undefined"
+          :actions="canManageDepartments ? [{ label: 'Criar departamento', onClick: openCreate }] : undefined"
         />
 
         <UEmpty

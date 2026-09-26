@@ -11,9 +11,11 @@ export const statusOrder: Record<WorkTaskStatus, number> = {
   dismissed: 3
 }
 
-export function statusPresentation(taskStatus: WorkTaskStatus): {
+export type TaskChipColor = 'info' | 'warning' | 'success' | 'neutral'
+
+export function calendarStatusPresentation(taskStatus: WorkTaskStatus): {
   label: string
-  color: 'info' | 'warning' | 'success' | 'neutral'
+  color: TaskChipColor
   dotClass: string
 } {
   switch (taskStatus) {
@@ -26,6 +28,34 @@ export function statusPresentation(taskStatus: WorkTaskStatus): {
     case 'dismissed':
       return { label: 'Dispensada', color: 'neutral', dotClass: 'bg-muted' }
   }
+}
+
+/** Ported from nuxt-ui-templates/calendar `utils/calendars.ts` — status → chip fill. */
+export const taskChipBlockClasses: Record<TaskChipColor, string> = {
+  info: 'bg-info/15 hover:bg-info/25 data-active:bg-info/25 text-info border-info',
+  warning: 'bg-warning/15 hover:bg-warning/25 data-active:bg-warning/25 text-warning border-warning',
+  success: 'bg-success/15 hover:bg-success/25 data-active:bg-success/25 text-success border-success',
+  neutral: 'bg-muted/15 hover:bg-muted/25 data-active:bg-muted/25 text-muted border-muted'
+}
+
+export const taskChipCompactClasses: Record<TaskChipColor, string> = {
+  info: 'max-lg:bg-info/15 max-lg:text-info',
+  warning: 'max-lg:bg-warning/15 max-lg:text-warning',
+  success: 'max-lg:bg-success/15 max-lg:text-success',
+  neutral: 'max-lg:bg-muted/15 max-lg:text-muted'
+}
+
+export const taskChipOutlineClasses: Record<TaskChipColor, string> = {
+  info: 'outline-info/25',
+  warning: 'outline-warning/25',
+  success: 'outline-success/25',
+  neutral: 'outline-inverted/25'
+}
+
+export function formatWeekdayShort(key: string, locale = 'pt-BR') {
+  const parsed = parseDateKey(key)
+  if (!parsed) return ''
+  return new Date(parsed.year, parsed.month - 1, parsed.day).toLocaleDateString(locale, { weekday: 'short' })
 }
 
 export function pad2(n: number) {
